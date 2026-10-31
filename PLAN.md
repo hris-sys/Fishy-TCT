@@ -218,6 +218,8 @@ _Keep-alive: Vercel Cron calls `/api/keepalive` daily, which runs `keepalive()` 
 
 **Done when:** it installs on iOS and Android, survives a week of nobody opening it, and a new friend joins without you explaining anything.
 
+_Merged to production (Oct 31, 2026) after passing on two devices; `/api/keepalive` answers from the database in production. Headless end-to-end (13/13): moving to a new device with a code, TV mode, invite sharing, wrong-code message. Still to watch: installing on iOS and Android from production, a quiet week, and a new friend joining unaided._
+
 ## Gotchas
 
 Four known traps, each already handled in the plan.

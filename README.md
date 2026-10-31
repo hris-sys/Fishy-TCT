@@ -14,7 +14,10 @@ npm run dev            # http://localhost:5173
 npm run dev -- --host  # also reachable from your phone on the same Wi-Fi
 ```
 
-Add `?debug` to the URL for an FPS and resolution readout.
+URL options:
+
+- `?debug` shows an FPS readout and the **Tune** panel for live species tuning. **Copy config** puts the tuned numbers on the clipboard, ready to paste into `src/species/<id>/config.ts`.
+- `?fish=30` sets how many fish swim (default 15).
 
 `npm run build` typechecks and builds to `dist/`. `npm run typecheck` only typechecks.
 
@@ -46,6 +49,7 @@ Schema changes go through `supabase/migrations/` (`npx supabase migration new <n
 ```
 src/
   tank/      engine: PixiJS scene, no UI framework imports
+  species/   one folder per species: config.ts plus body/tail art
   ui/        screens and overlays
   data/      Supabase client, queries, realtime
 supabase/

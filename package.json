@@ -10,12 +10,14 @@
     "typecheck": "tsc"
   },
   "devDependencies": {
+    "@tweakpane/core": "^2.0.5",
     "supabase": "^2.122.0",
     "typescript": "~7.0.2",
     "vite": "^8.3.5"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.118.0",
-    "pixi.js": "^8.22.0"
+    "pixi.js": "^8.22.0",
+    "tweakpane": "^4.0.5"
   }
 }

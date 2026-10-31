@@ -8,7 +8,7 @@ export function showStats(tank: Tank) {
 
   const refresh = () => {
     const s = tank.stats()
-    el.textContent = `${Math.round(s.fps)} fps · ${s.width}×${s.height} @${s.resolution}x`
+    el.textContent = `${Math.round(s.fps)} fps · ${s.fish} fish · ${s.width}×${s.height} @${s.resolution}x`
   }
   refresh()
   setInterval(refresh, 500)

@@ -126,13 +126,15 @@ Goal: a real URL on your phone from day one.
 
 Goal: a tank that's pleasant to stare at, with placeholder faces.
 
-- [ ] Scene layers: gradient water, light rays, sand, swaying plants, bubbles and an anemone.
-- [ ] Species configs and placeholder art, with body and tail as separate layers and the face slot left empty. Kenney.nl's free CC0 packs or simple SVGs are fine for now.
-- [ ] Fish entity with a sine-driven tail wiggle and bob. Turn by tweening `scale.x` through 0; flip the body but never the face, or it jumps on every turn.
-- [ ] Movement from steering behaviors (wander, soft wall avoidance, light separation) inside each species' depth band. Other fish flee from nearby sharks.
-- [ ] A Tweakpane debug panel to tune species parameters live.
+- [x] Scene layers: gradient water, light rays, sand, swaying plants, bubbles and an anemone.
+- [x] Species configs and placeholder art, with body and tail as separate layers and the face slot left empty. Kenney.nl's free CC0 packs or simple SVGs are fine for now. _(Hand-drawn SVGs in `src/species/<id>/`; placeholder cartoon faces until iteration 2.)_
+- [x] Fish entity with a sine-driven tail wiggle and bob. Turn by tweening `scale.x` through 0; flip the body but never the face, or it jumps on every turn.
+- [x] Movement from steering behaviors (wander, soft wall avoidance, light separation) inside each species' depth band. Other fish flee from nearby sharks.
+- [x] A Tweakpane debug panel to tune species parameters live. _(Open with `?debug`; "Copy config" exports the tuned numbers.)_
 
 **Done when:** 15 placeholder fish swim for 5 minutes without clumping, jittering or escaping, at 60 fps on a mid-range phone.
+
+_Headless soak test (5 simulated minutes, 15 fish): no fish more than 1 px past an edge, fish spaced wider than a random spread, simulation under 0.2 ms per frame. Still to confirm: 60 fps on a real phone._
 
 ## Iteration 2 · Make your fish, local only (2–3 evenings)
 

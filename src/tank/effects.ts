@@ -4,7 +4,7 @@ import { makeCanvas, randomBetween } from './util'
 
 interface Particle {
   sprite: Sprite
-  kind: 'bubble' | 'foam'
+  kind: 'bubble' | 'foam' | 'z'
   x: number
   y: number
   vx: number
@@ -20,6 +20,8 @@ export interface Effects extends SceneLayer {
   splash(x: number, size: number): void
   /** A few bubbles at a point, e.g. trailing behind a fish that just dived in. */
   bubbles(x: number, y: number, count: number, size: number): void
+  /** A "z" floating up from a sleeping fish. */
+  snore(x: number, y: number): void
 }
 
 /** Short-lived particles: splashes and bubble bursts. Sprites are pooled and reused. */
@@ -27,13 +29,15 @@ export function createEffects(): Effects {
   const view = new Container()
   const bubbleTexture = Texture.from(drawBubble())
   const foamTexture = Texture.from(drawFoam())
+  const zTexture = Texture.from(drawZ())
   const live: Particle[] = []
   const pool: Sprite[] = []
   let world: TankWorld | null = null
 
   function emit(kind: Particle['kind'], x: number, y: number, vx: number, vy: number, size: number, life: number) {
     const sprite = pool.pop() ?? new Sprite()
-    sprite.texture = kind === 'bubble' ? bubbleTexture : foamTexture
+    sprite.texture = kind === 'bubble' ? bubbleTexture : kind === 'foam' ? foamTexture : zTexture
+    sprite.rotation = 0
     sprite.anchor.set(0.5)
     sprite.visible = true
     view.addChild(sprite)
@@ -61,6 +65,10 @@ export function createEffects(): Effects {
         emit('bubble', x + randomBetween(-size, size) * 0.4, y + randomBetween(-size, size) * 0.3, randomBetween(-20, 20) * s, randomBetween(-10, 30) * s, randomBetween(1.5, 4) * s, randomBetween(0.8, 1.6))
       }
     },
+    snore(x, y) {
+      const s = world?.scale ?? 1
+      emit('z', x, y, randomBetween(-4, 4) * s, -14 * s, randomBetween(14, 18) * s, 2.6)
+    },
     update(dt) {
       const s = world?.scale ?? 1
       for (let i = live.length - 1; i >= 0; i--) {
@@ -72,6 +80,16 @@ export function createEffects(): Effects {
           view.removeChild(p.sprite)
           pool.push(p.sprite)
           live.splice(i, 1)
+          continue
+        }
+        if (p.kind === 'z') {
+          // Drifts up, sways, grows a little, fades in and out.
+          p.x += p.vx * dt
+          p.y += p.vy * dt
+          p.sprite.position.set(p.x + Math.sin(p.age * 2.2 + p.phase) * 4 * s, p.y)
+          p.sprite.scale.set((p.size * (0.7 + t * 0.6)) / 32)
+          p.sprite.rotation = Math.sin(p.age * 1.7 + p.phase) * 0.25
+          p.sprite.alpha = Math.min(1, t * 6) * (1 - t) * 0.95
           continue
         }
         if (p.kind === 'foam') {
@@ -107,6 +125,19 @@ function drawBubble() {
   ctx.arc(11, 11, 3.5, 0, Math.PI * 2)
   ctx.fillStyle = 'rgba(255, 255, 255, 0.85)'
   ctx.fill()
+  return canvas
+}
+
+function drawZ() {
+  const { canvas, ctx } = makeCanvas(32)
+  ctx.font = 'bold 26px system-ui, -apple-system, sans-serif'
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.lineWidth = 4
+  ctx.strokeStyle = 'rgba(6, 36, 61, 0.55)'
+  ctx.strokeText('z', 16, 15)
+  ctx.fillStyle = '#ffffff'
+  ctx.fillText('z', 16, 15)
   return canvas
 }
 

@@ -26,7 +26,7 @@ export interface FishChanges {
   face: Blob | null
 }
 
-function fromRow(row: Record<string, unknown>): FishRecord {
+export function fromRow(row: Record<string, unknown>): FishRecord {
   return {
     id: String(row.id),
     tankId: String(row.tank_id),

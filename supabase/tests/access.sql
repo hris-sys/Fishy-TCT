@@ -108,6 +108,8 @@ update public.fish set name = 'Bubbly', tint = 16757928 where owner_id = 'bbbbbb
 select access_test.expect((select name from public.fish where owner_id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb') = 'Bubbly', 'people edit their own fish');
 update public.tank_members set display_name = 'Bea B' where user_id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 select access_test.expect((select display_name from public.my_tanks()) = 'Bea B', 'members rename themselves');
+select access_test.expect(private.can_use_tank_channel('tank:11111111-1111-4111-8111-111111111111'), 'members may use their tank''s live channel');
+select access_test.expect(not private.can_use_tank_channel('tank:22222222-2222-4222-8222-222222222222'), 'members may not use other tanks'' channels');
 
 -- C: signed in, but never joined. Sees and changes nothing.
 reset role;
@@ -118,6 +120,7 @@ select access_test.expect((select count(*) from public.tank_members) = 0, 'outsi
 select access_test.expect((select count(*) from storage.objects where bucket_id = 'faces') = 0, 'outsiders see no faces');
 select access_test.expect((select count(*) from public.my_tanks()) = 0, 'outsiders have no tanks');
 select access_test.expect(public.invite_tank_name('nope-nope-nope') is null, 'a wrong invite code reveals nothing');
+select access_test.expect(not private.can_use_tank_channel('tank:11111111-1111-4111-8111-111111111111'), 'outsiders may not use a tank''s live channel');
 select access_test.expect_error($$insert into storage.objects (bucket_id, name)
   values ('faces', '11111111-1111-4111-8111-111111111111/cccccccc-cccc-4ccc-8ccc-cccccccccccc/x.webp')$$,
   'outsiders cannot upload faces');

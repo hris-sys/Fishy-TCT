@@ -1,8 +1,9 @@
 import { type FishRecord, createFish, describeError, errorDetail, listFish, loadFace, removeFish, signFaceUrls, updateFish } from '../data/fish'
+import { connectTank } from '../data/live'
 import { currentUserId, ensureSignedIn } from '../data/session'
 import { type MyTank, inviteTankName, joinTank, myTanks } from '../data/tanks'
 import { species } from '../species'
-import type { Tank } from '../tank'
+import type { ResidentInput, Tank } from '../tank'
 import { openFishSheet } from './add-fish'
 import { h, icon } from './dom'
 import { showJoin, showLoading, showMessage } from './screens'
@@ -60,10 +61,32 @@ export async function startShared(tank: Tank, invite: string | null, setTapHandl
   }
 }
 
-/** Loads everyone's fish into the tank, then wires up adding, editing and removing. */
+/**
+ * Loads everyone's fish into the tank, keeps it live (new, changed and removed fish; who's online),
+ * and wires up adding, editing and removing.
+ */
 async function openTank(tank: Tank, info: MyTank, userId: string, setTapHandler: (handler: TapHandler) => void, addRightAway: boolean) {
   const records = new Map<string, FishRecord>()
   const faces = new Map<string, CanvasImageSource>()
+  /** Who's online, by user id. Null until the first presence update: until then, nobody sleeps. */
+  let online: Set<string> | null = null
+  /** True while our own new fish is being saved, so its live "insert" doesn't add it twice. */
+  let savingNew = false
+
+  const isOnline = (ownerId: string) => ownerId === userId || online === null || online.has(ownerId)
+  const toResident = (record: FishRecord, face: CanvasImageSource): ResidentInput => ({
+    id: record.id,
+    name: record.name,
+    species: record.species,
+    tint: record.tint,
+    face,
+  })
+
+  async function faceFor(record: FishRecord) {
+    const url = (await signFaceUrls([record.facePath])).get(record.facePath)
+    if (!url) throw new Error(`No face URL for fish ${record.id}`)
+    return loadFace(url)
+  }
 
   const rows = await listFish(info.id)
   const urls = await signFaceUrls(rows.map((row) => row.facePath))
@@ -75,7 +98,7 @@ async function openTank(tank: Tank, info: MyTank, userId: string, setTapHandler:
       try {
         const face = await loadFace(url)
         faces.set(row.id, face)
-        tank.addResident({ id: row.id, name: row.name, species: row.species, tint: row.tint, face })
+        tank.addResident(toResident(row, face))
       } catch (error) {
         console.warn('A face could not be loaded', row.id, error)
       }
@@ -87,6 +110,92 @@ async function openTank(tank: Tank, info: MyTank, userId: string, setTapHandler:
   const refreshButton = () => button.replaceChildren(icon(mine ? 'fish' : 'plus'), mine ? 'Your fish' : 'Add your fish')
   refreshButton()
   document.body.append(button)
+
+  /** Removed fish swim off-screen. */
+  function forget(id: string) {
+    tank.removeResident(id, { swimAway: true })
+    records.delete(id)
+    faces.delete(id)
+    if (mine?.id === id) {
+      mine = null
+      refreshButton()
+    }
+  }
+
+  /** Brings the tank in line with one fish's latest state, from a live event or a refetch. */
+  async function apply(record: FishRecord) {
+    const known = records.get(record.id)
+    if (record.deletedAt) {
+      if (known) forget(record.id)
+      return
+    }
+    if (!known) {
+      if (record.ownerId === userId && savingNew) return
+      const face = await faceFor(record)
+      if (records.has(record.id)) return
+      records.set(record.id, record)
+      faces.set(record.id, face)
+      tank.addResident(toResident(record, face), { dropIn: true })
+      tank.setAsleep(record.id, !isOnline(record.ownerId))
+      // Your own fish, made on another device.
+      if (record.ownerId === userId) {
+        mine = record
+        refreshButton()
+      }
+      return
+    }
+    // Our own saves already applied this change; older events are stale.
+    if (Date.parse(record.updatedAt) <= Date.parse(known.updatedAt)) return
+    records.set(record.id, record)
+    const changes: Partial<Omit<ResidentInput, 'id'>> = { name: record.name, species: record.species, tint: record.tint }
+    if (record.facePath !== known.facePath) {
+      const face = await faceFor(record)
+      faces.set(record.id, face)
+      changes.face = face
+    }
+    tank.updateResident(record.id, changes)
+    if (mine?.id === record.id) mine = record
+  }
+
+  /** Fetches the whole list again and reconciles, to catch anything missed while away. */
+  async function refetch() {
+    const fresh = await listFish(info.id)
+    const ids = new Set(fresh.map((record) => record.id))
+    for (const [id, record] of [...records]) {
+      if (!ids.has(id)) await apply({ ...record, deletedAt: new Date().toISOString() })
+    }
+    for (const record of fresh) await apply(record)
+  }
+
+  // Live changes are applied one at a time, in order, so a fish can't be added twice.
+  let queue = Promise.resolve()
+  const enqueue = (task: () => Promise<void>) => {
+    queue = queue.then(task).catch((error) => console.warn('A live update failed', error))
+  }
+
+  const updateSleep = () => {
+    for (const record of records.values()) tank.setAsleep(record.id, !isOnline(record.ownerId))
+  }
+
+  try {
+    const live = await connectTank(info.id, userId, {
+      fish: (record) => enqueue(() => apply(record)),
+      presence: (ids) => {
+        online = ids
+        updateSleep()
+      },
+      reconnected: () => enqueue(refetch),
+    })
+    // In the background you count as offline; coming back, catch up on anything missed.
+    document.addEventListener('visibilitychange', () => {
+      live.setVisible(!document.hidden)
+      if (!document.hidden) enqueue(refetch)
+    })
+    window.addEventListener('pagehide', () => live.setVisible(false))
+  } catch (error) {
+    // Without the live connection the tank still works; it just needs a refresh to update.
+    console.warn('Live updates are unavailable', error)
+  }
 
   function openSheet() {
     button.hidden = true
@@ -114,12 +223,17 @@ async function openTank(tank: Tank, info: MyTank, userId: string, setTapHandler:
           mine = updated
         } else {
           if (!fish.blob) throw new Error('A photo is needed')
-          const created = await createFish(info.id, userId, { name: fish.name, species: fish.species, tint: fish.tint, face: fish.blob })
-          records.set(created.id, created)
-          faces.set(created.id, fish.face)
-          tank.addResident({ id: created.id, name: created.name, species: created.species, tint: created.tint, face: fish.face }, { dropIn: true })
-          setTimeout(() => tank.showTag(created.id), 1400)
-          mine = created
+          savingNew = true
+          try {
+            const created = await createFish(info.id, userId, { name: fish.name, species: fish.species, tint: fish.tint, face: fish.blob })
+            records.set(created.id, created)
+            faces.set(created.id, fish.face)
+            tank.addResident(toResident(created, fish.face), { dropIn: true })
+            setTimeout(() => tank.showTag(created.id), 1400)
+            mine = created
+          } finally {
+            savingNew = false
+          }
         }
         refreshButton()
       },
@@ -127,8 +241,6 @@ async function openTank(tank: Tank, info: MyTank, userId: string, setTapHandler:
         ? async () => {
             await removeFish(current)
             forget(current.id)
-            mine = null
-            refreshButton()
           }
         : undefined,
       onClose: () => {
@@ -136,12 +248,6 @@ async function openTank(tank: Tank, info: MyTank, userId: string, setTapHandler:
         button.hidden = false
       },
     })
-  }
-
-  function forget(id: string) {
-    tank.removeResident(id)
-    records.delete(id)
-    faces.delete(id)
   }
 
   // The tank owner can remove anyone's fish: tap it, then tap Remove twice.

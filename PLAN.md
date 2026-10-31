@@ -175,12 +175,16 @@ _Checks: `npm run db:check` plays owner, member, outsider and signed-out visitor
 
 Goal: the tank feels inhabited.
 
-- [ ] Add `fish` to the realtime publication and subscribe filtered by tank. New fish splash in, edited fish change in place, and soft-deleted fish swim off-screen.
-- [ ] Presence: online friends' fish are bright and active, while offline ones slow down, sink a little and blow "z" bubbles.
-- [ ] Use a private channel (Realtime Authorization) so only members can join Presence and Broadcast.
-- [ ] Refetch the fish list on reconnect or when the tab comes back, to catch missed events.
+- [x] Add `fish` to the realtime publication and subscribe filtered by tank. New fish splash in, edited fish change in place, and soft-deleted fish swim off-screen.
+- [x] Presence: online friends' fish are bright and active, while offline ones slow down, sink a little and blow "z" bubbles.
+- [x] Use a private channel (Realtime Authorization) so only members can join Presence and Broadcast.
+- [x] Refetch the fish list on reconnect or when the tab comes back, to catch missed events.
+
+_One private channel per tank, `tank:{tank_id}`, carries Postgres Changes and Presence (Broadcast joins it in iteration 5). Putting the app in the background counts as going offline. Note: the first private channel on a fresh project failed once with `MissingPartition` until Realtime created its daily message partitions; it has worked since._
 
 **Done when:** a fish created on one phone appears on another within about 2 s, and closing the app on one phone puts its owner's fish to sleep on the other.
+
+_Headless end-to-end with two browsers against the real project: a new fish appeared on the other screen 1.5 s after tapping Drop it in (upload included); backgrounding put that person's fish to sleep in ~3.4 s and waking took ~3.9 s; a species change, an owner removal and a change missed while disconnected all came through. Outsiders are refused the channel. Still to confirm on real phones._
 
 ## Iteration 5 · Play (2–3 evenings)
 

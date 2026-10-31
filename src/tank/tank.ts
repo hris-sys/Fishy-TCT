@@ -54,7 +54,10 @@ export interface Tank {
   addResident(input: ResidentInput, options?: { dropIn?: boolean }): void
   /** Name and tint change in place; a new species or face rebuilds the fish where it swims. */
   updateResident(id: string, changes: Partial<Omit<ResidentInput, 'id'>>): void
-  removeResident(id: string): void
+  /** With `swimAway`, the fish swim off-screen first instead of vanishing. */
+  removeResident(id: string, options?: { swimAway?: boolean }): void
+  /** Offline people's fish doze: dimmer, slower, a little lower, blowing "z"s. */
+  setAsleep(id: string, asleep: boolean): void
   placeholderCount(): number
   setPlaceholders(count: number): void
   /** Shows someone's name tag, as if their fish was tapped. */
@@ -179,7 +182,8 @@ export async function createTank(host: HTMLElement, options: TankOptions): Promi
     }),
     addResident: (input, addOptions) => fish.add(input, addOptions?.dropIn ?? false),
     updateResident: (id, changes) => fish.edit(id, changes),
-    removeResident: (id) => fish.remove(id),
+    removeResident: (id, removeOptions) => fish.remove(id, removeOptions?.swimAway ?? false),
+    setAsleep: (id, asleep) => fish.setAsleep(id, asleep),
     placeholderCount: () => fish.placeholderCount(),
     setPlaceholders: (count) => fish.setPlaceholders(count),
     showTag(id) {

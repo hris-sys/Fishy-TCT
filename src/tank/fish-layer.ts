@@ -13,6 +13,8 @@ const MAX_STEP = 1 / 50
 const GRAVITY = 900
 /** Seconds between school members dropping in, so a school pours in one after another. */
 const DROP_STAGGER = 0.08
+/** Seconds for a fish to drift off to sleep, or wake up. */
+const SLEEP_EASE = 1.2
 
 const PLACEHOLDER_NAMES = ['Mira', 'Teo', 'Lina', 'Bo', 'Ari', 'Niko', 'Zoe', 'Ivo', 'Sana', 'Max', 'Ema', 'Dani', 'Rui', 'Kai', 'Lea', 'Tom', 'Vera', 'Omar', 'Yuki', 'Pia']
 
@@ -36,6 +38,10 @@ interface Resident {
   face: Texture
   fish: Fish[]
   placeholder: boolean
+  /** Removed, and swimming off-screen; gone for good once every fish has left. */
+  leaving: boolean
+  /** Seconds until the next "z" while asleep. */
+  snoreTimer: number
 }
 
 export interface FishLayer extends SceneLayer {
@@ -49,7 +55,9 @@ export interface FishLayer extends SceneLayer {
   add(input: ResidentInput, dropIn: boolean): void
   /** Applies a change. Name and tint change in place; a new species or face rebuilds the fish where they are. */
   edit(id: string, changes: Partial<Omit<ResidentInput, 'id'>>): void
-  remove(id: string): void
+  /** With `swimAway`, the fish swim off the nearest side before disappearing. */
+  remove(id: string, swimAway: boolean): void
+  setAsleep(id: string, asleep: boolean): void
   /** Re-cuts every face of one species, after its mask was tuned. */
   refreshSpecies(id: string): void
   /** The fish nearest to a screen point, if the point is on or close to it. */
@@ -128,12 +136,14 @@ export function createFishLayer(species: LoadedSpecies[], effects: Effects): Fis
   function addResident(input: ResidentInput, placeholder: boolean, dropIn: boolean) {
     const kind = findSpecies(input.species)
     const resident: Resident = {
-      owner: { id: input.id, name: input.name, tint: input.tint ?? null },
+      owner: { id: input.id, name: input.name, tint: input.tint ?? null, asleep: false, awake: 1 },
       species: kind,
       faceSource: input.face,
       face: bake(kind, input.face),
       fish: [],
       placeholder,
+      leaving: false,
+      snoreTimer: randomBetween(0.5, 2.5),
     }
     populate(resident)
     if (world) place(resident, world, dropIn)
@@ -144,6 +154,28 @@ export function createFishLayer(species: LoadedSpecies[], effects: Effects): Fis
     unpopulate(resident)
     resident.face.destroy(true)
     residents.splice(residents.indexOf(resident), 1)
+  }
+
+  /** Swims a removed fish off the side of the tank. Returns true once it is out of sight. */
+  function swimAway(fish: Fish, at: TankWorld, dt: number) {
+    const direction = fish.leaving!.direction
+    const s = at.scale
+    // Brisk, even for slow species, so a removal doesn't take ages.
+    const cruise = Math.max(fish.config.swim.speed * 1.8, 110) * s
+    fish.vx += (direction * cruise - fish.vx) * dt * 2.5
+    fish.vy -= fish.vy * dt * 2
+    fish.x += fish.vx * dt
+    fish.y += fish.vy * dt
+    const reach = fish.halfWidth(s) * 1.4
+    return direction > 0 ? fish.x - reach > at.width : fish.x + reach < 0
+  }
+
+  function startLeaving(resident: Resident, at: TankWorld) {
+    resident.leaving = true
+    for (const fish of resident.fish) {
+      fish.entering = null
+      fish.leaving = { direction: fish.x < at.width / 2 ? -1 : 1 }
+    }
   }
 
   /** The fall: through the air, a splash at the surface, then quickly slowed by the water. */
@@ -175,7 +207,7 @@ export function createFishLayer(species: LoadedSpecies[], effects: Effects): Fis
 
   return {
     view,
-    count: () => residents.length,
+    count: () => residents.filter((resident) => !resident.leaving).length,
     swimming: () => allFish.length,
     placeholderCount: () => residents.filter((resident) => resident.placeholder).length,
     setPlaceholders(count) {
@@ -196,12 +228,11 @@ export function createFishLayer(species: LoadedSpecies[], effects: Effects): Fis
       for (const resident of current.slice(count).reverse()) removeResident(resident)
     },
     add(input, dropIn) {
-      const existing = residents.find((resident) => resident.owner.id === input.id)
-      if (existing) removeResident(existing)
+      for (const existing of residents.filter((resident) => resident.owner.id === input.id)) removeResident(existing)
       addResident(input, false, dropIn)
     },
     edit(id, changes) {
-      const resident = residents.find((r) => r.owner.id === id)
+      const resident = residents.find((r) => r.owner.id === id && !r.leaving)
       if (!resident) return
       if (changes.name !== undefined) resident.owner.name = changes.name
       if (changes.tint !== undefined) resident.owner.tint = changes.tint
@@ -225,9 +256,15 @@ export function createFishLayer(species: LoadedSpecies[], effects: Effects): Fis
         }
       }
     },
-    remove(id) {
-      const resident = residents.find((r) => r.owner.id === id)
-      if (resident) removeResident(resident)
+    remove(id, swimAway) {
+      const resident = residents.find((r) => r.owner.id === id && !r.leaving)
+      if (!resident) return
+      if (swimAway && world) startLeaving(resident, world)
+      else removeResident(resident)
+    },
+    setAsleep(id, asleep) {
+      const resident = residents.find((r) => r.owner.id === id && !r.leaving)
+      if (resident) resident.owner.asleep = asleep
     },
     refreshSpecies(id) {
       for (const resident of residents) {
@@ -243,7 +280,7 @@ export function createFishLayer(species: LoadedSpecies[], effects: Effects): Fis
       let best: Fish | null = null
       let bestDistance = Infinity
       for (const fish of allFish) {
-        if (!fish.view.visible) continue
+        if (!fish.view.visible || fish.leaving) continue
         const distance = Math.hypot(fish.x - x, fish.y - y)
         // Generous reach, so small fish are easy to hit with a finger.
         const reach = Math.max(fish.radius(world.scale) * 1.3, 24)
@@ -255,7 +292,7 @@ export function createFishLayer(species: LoadedSpecies[], effects: Effects): Fis
       return best
     },
     firstFishOf(id) {
-      return residents.find((r) => r.owner.id === id)?.fish[0] ?? null
+      return residents.find((r) => r.owner.id === id && !r.leaving)?.fish[0] ?? null
     },
     resize(next) {
       if (world) {
@@ -287,8 +324,33 @@ export function createFishLayer(species: LoadedSpecies[], effects: Effects): Fis
         }
         for (const fish of allFish) {
           fish.updateTurn(step, world.scale)
-          if (fish.entering) fall(fish, world, step)
+          if (fish.leaving) swimAway(fish, world, step)
+          else if (fish.entering) fall(fish, world, step)
           else steer(fish, allFish, world, step)
+        }
+      }
+      for (const resident of [...residents]) {
+        // Removed fish are deleted once every one of them has left the screen.
+        if (resident.leaving) {
+          const s = world.scale
+          const gone = resident.fish.every((fish) => {
+            const reach = fish.halfWidth(s) * 1.4
+            return fish.x - reach > world!.width || fish.x + reach < 0
+          })
+          if (gone) removeResident(resident)
+          continue
+        }
+        // Drift off to sleep, or wake up, gradually.
+        const owner = resident.owner
+        owner.awake += ((owner.asleep ? 0 : 1) - owner.awake) * (1 - Math.exp(-dt / SLEEP_EASE))
+        // Sleepers blow a "z" every few seconds, from one fish of a school.
+        if (owner.awake < 0.5) {
+          resident.snoreTimer -= dt
+          if (resident.snoreTimer <= 0) {
+            resident.snoreTimer = randomBetween(2, 3.5)
+            const fish = resident.fish[Math.floor(Math.random() * resident.fish.length)]
+            if (fish && !fish.entering) effects.snore(fish.x + Math.sign(fish.vx || 1) * fish.halfWidth(world.scale) * 0.4, fish.y - fish.halfHeight(world.scale))
+          }
         }
       }
       for (const fish of allFish) fish.animate(dt, world)

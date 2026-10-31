@@ -35,10 +35,15 @@ export function waterColumn(fish: Fish, world: TankWorld) {
   return { top: SURFACE_GAP * world.scale + halfHeight, bottom: world.sandY - halfHeight * 0.6 }
 }
 
-/** Where in the column this fish's species likes to be. */
+/** Asleep fish sink this much lower in their band (as a fraction of the water column). */
+const SLEEP_SINK = 0.15
+
+/** Where in the column this fish's species likes to be; a little lower while asleep. */
 export function depthBand(fish: Fish, world: TankWorld) {
   const column = waterColumn(fish, world)
-  const { top, bottom } = fish.config.swim.depth
+  const sink = (1 - fish.owner.awake) * SLEEP_SINK
+  const top = Math.min(1, fish.config.swim.depth.top + sink)
+  const bottom = Math.min(1, fish.config.swim.depth.bottom + sink)
   return { top: lerp(column.top, column.bottom, top), bottom: lerp(column.top, column.bottom, bottom), column }
 }
 
@@ -51,8 +56,12 @@ export function steer(fish: Fish, everyone: readonly Fish[], world: TankWorld, d
   const { swim } = fish.config
   const s = world.scale
 
+  // Asleep fish drift slowly and hardly meander.
+  const awake = fish.owner.awake
+  const energy = 0.3 + 0.7 * awake
+
   // Darting: a sudden burst of speed every few seconds that fades out quickly.
-  if (swim.dart > 0) {
+  if (swim.dart > 0 && awake > 0.8) {
     fish.dartTimer -= dt
     if (fish.dartTimer <= 0) {
       fish.boost = Math.max(fish.boost, swim.dart - 1)
@@ -61,12 +70,12 @@ export function steer(fish: Fish, everyone: readonly Fish[], world: TankWorld, d
   }
   fish.boost *= Math.exp(-dt * 2.5)
 
-  const cruise = swim.speed * s * fish.pace * (1 + fish.boost)
+  const cruise = swim.speed * s * fish.pace * (1 + fish.boost) * energy
   let ax = 0
   let ay = 0
 
   // Wander: aim slightly off the current heading, with the offset drifting smoothly at random.
-  fish.wander += -fish.wander * WANDER_PULL * dt + (Math.random() * 2 - 1) * WANDER_JITTER * swim.wander * Math.sqrt(dt)
+  fish.wander += -fish.wander * WANDER_PULL * dt + (Math.random() * 2 - 1) * WANDER_JITTER * swim.wander * energy * Math.sqrt(dt)
   fish.wander = clamp(fish.wander, -MAX_WANDER, MAX_WANDER)
   const heading = Math.atan2(fish.vy, fish.vx) + fish.wander
   ax += (Math.cos(heading) * cruise - fish.vx) * swim.turnRate

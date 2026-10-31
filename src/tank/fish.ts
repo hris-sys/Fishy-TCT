@@ -19,6 +19,10 @@ export interface Owner {
   name: string
   /** Body colour multiplier as 0xRRGGBB, or null for the species' natural colours. */
   tint: number | null
+  /** The owner is offline: their fish dozes. */
+  asleep: boolean
+  /** 1 when fully awake, 0 when fully asleep; eases toward `asleep` so changes look gradual. */
+  awake: number
 }
 
 /** A group of fish wearing the same face, steering as one. */
@@ -59,6 +63,8 @@ export class Fish {
    * steering takes over once it has slowed down in the water.
    */
   entering: { delay: number; inWater: number; splashed: boolean } | null = null
+  /** Set when the fish has been removed and is swimming off-screen toward this side. */
+  leaving: { direction: 1 | -1 } | null = null
 
   private readonly flip = new Container()
   private readonly tail: Sprite
@@ -166,8 +172,9 @@ export class Fish {
     const targetPitch = clamp(Math.atan2(this.vy, Math.abs(this.vx)), -MAX_PITCH, MAX_PITCH) * side
     this.pitch += (targetPitch - this.pitch) * (1 - Math.exp(-dt * 4))
 
-    // Tail beats faster when swimming faster.
-    this.tailPhase += dt * Math.PI * 2 * swim.wiggleHz * (0.6 + 0.6 * Math.min(speed / cruise, 2))
+    // Tail beats faster when swimming faster, and lazily when asleep.
+    const drowsy = 0.35 + 0.65 * this.owner.awake
+    this.tailPhase += dt * Math.PI * 2 * swim.wiggleHz * drowsy * (0.6 + 0.6 * Math.min(speed / cruise, 2))
     this.tail.anchor.set(tail.pivot.x / this.tail.texture.width, tail.pivot.y / this.tail.texture.height)
     this.tail.position.set(tail.attach.x, tail.attach.y)
     this.tail.rotation = Math.sin(this.tailPhase) * tail.swing
@@ -189,6 +196,11 @@ export class Fish {
       g *= ((own >> 8) & 255) / 255
       b *= (own & 255) / 255
     }
+    // Asleep: the body dims. The face is left alone.
+    const dim = 0.55 + 0.45 * this.owner.awake
+    r *= dim
+    g *= dim
+    b *= dim
     const tint = (Math.round(r) << 16) | (Math.round(g) << 8) | Math.round(b)
     this.body.tint = tint
     this.tail.tint = tint

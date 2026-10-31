@@ -223,7 +223,7 @@ _Merged to production (Oct 31, 2026) after passing on two devices; `/api/keepali
 ## After the plan
 
 - [x] TCTank, the group's final tank. People in several tanks land in the one they used last on that device (or the newest joined).
-- [ ] Chat: a small see-through window for each tank's members, with the last 50 messages kept; new messages also appear as speech bubbles above the author's fish. Members-only (RLS), names filled in by the database, a little rate limit, and messages move with you to a new device.
+- [x] Chat: a small see-through window for each tank's members, with the last 50 messages kept; new messages also appear as speech bubbles above the author's fish. Members-only (RLS), names filled in by the database, a little rate limit, and messages move with you to a new device.
 
 ## Gotchas
 

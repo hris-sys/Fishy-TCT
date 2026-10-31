@@ -3,13 +3,17 @@
 //
 //   npm run check:outsider
 //
-// Uses the public key from .env.local, like the app. To try real face files, it looks up a few
+// Uses the public key from .env, like the app. To try real face files, it looks up a few
 // face paths with the Supabase CLI (your `supabase login`), then tries to sign and download them.
 // Each run creates one anonymous user, which stays harmless and empty.
 import { execFileSync } from 'node:child_process'
+import { existsSync } from 'node:fs'
 import { createClient } from '@supabase/supabase-js'
 
-process.loadEnvFile('.env.local')
+
+// Public settings from .env, overridden by .env.local if present (same order as Vite).
+if (existsSync('.env.local')) process.loadEnvFile('.env.local')
+process.loadEnvFile('.env')
 const db = createClient(process.env.VITE_SUPABASE_URL, process.env.VITE_SUPABASE_ANON_KEY, { auth: { persistSession: false } })
 
 const { data: auth, error: signInError } = await db.auth.signInAnonymously()

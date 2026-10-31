@@ -23,7 +23,6 @@ dist-ssr
 *.sln
 *.sw?
 
-# Env files (keep .env.example)
-.env
+# Env files: .env holds only public values and is committed; everything else stays local.
 .env.*
 !.env.example

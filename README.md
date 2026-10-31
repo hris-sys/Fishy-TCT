@@ -43,12 +43,11 @@ URL options:
    npx supabase login
    npx supabase link --project-ref <your-project-ref>
    ```
-3. Copy `.env.example` to `.env.local` and fill in the project URL and the public key from **Project Settings → API**. Use the anon key, or the publishable key (`sb_publishable_…`) if that's what the dashboard shows.
-4. Add the same two variables in **Vercel → Project → Settings → Environment Variables**.
+3. The project URL and publishable key live in the committed `.env` file. Both are public by design (every visitor's browser receives them; Row Level Security protects the data), so Vercel needs no environment variables. To point a local copy at another project, put different values in `.env.local`, which overrides `.env` and stays out of git.
 
-The service-role / secret key never goes into the frontend, `.env.local` or the repo.
+The service-role / secret key never goes into the frontend, any `.env` file or the repo.
 
-5. Turn on **Authentication → Sign In / Providers → Allow anonymous sign-ins**. Joining needs it.
+4. Turn on **Authentication → Sign In / Providers → Allow anonymous sign-ins**. Joining needs it.
 
 Schema changes go through `supabase/migrations/` (`npx supabase migration new <name>`, then `npm run db:push`), never by hand in the dashboard.
 

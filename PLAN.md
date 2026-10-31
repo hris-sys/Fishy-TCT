@@ -184,7 +184,7 @@ _One private channel per tank, `tank:{tank_id}`, carries Postgres Changes and Pr
 
 **Done when:** a fish created on one phone appears on another within about 2 s, and closing the app on one phone puts its owner's fish to sleep on the other.
 
-_Headless end-to-end with two browsers against the real project: a new fish appeared on the other screen 1.5 s after tapping Drop it in (upload included); backgrounding put that person's fish to sleep in ~3.4 s and waking took ~3.9 s; a species change, an owner removal and a change missed while disconnected all came through. Outsiders are refused the channel. Still to confirm on real phones._
+_Headless end-to-end with two browsers against the real project: a new fish appeared on the other screen 1.5 s after tapping Drop it in (upload included); backgrounding put that person's fish to sleep in ~3.4 s and waking took ~3.9 s; a species change, an owner removal and a change missed while disconnected all came through. Outsiders are refused the channel. Passed on two real devices and merged (Oct 31, 2026)._
 
 ## Iteration 5 · Play (2–3 evenings)
 

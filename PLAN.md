@@ -135,7 +135,7 @@ Goal: a tank that's pleasant to stare at, with placeholder faces.
 
 **Done when:** 15 placeholder fish swim for 5 minutes without clumping, jittering or escaping, at 60 fps on a mid-range phone.
 
-_Headless soak test (5 simulated minutes, 15 people = 33 fish with three schools): no fish past an edge, schools stay within ~25 px of their middle, simulation about 0.2 ms per frame. The first version passed on a real phone; the realism pass needs a re-check._
+_Headless soak test (5 simulated minutes, 15 people = 33 fish with three schools): no fish past an edge, schools stay within ~25 px of their middle, simulation about 0.2 ms per frame. Passed on a real phone (Oct 31, 2026); merged to main._
 
 ## Iteration 2 · Make your fish, local only (2–3 evenings)
 

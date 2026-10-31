@@ -19,6 +19,8 @@ Opening the app:
 - `/join/{code}` is an invite link: pick a name, join, add your fish. The first person to open a new tank's link owns it.
 - `/` takes returning visitors straight into their tank; everyone else sees "invite-only".
 
+On a phone, add it to the home screen from the menu (⋯, top right). On an iPhone, the Home Screen app keeps its own sign-in, separate from Safari, so the menu shows a one-time code to type into it; the same code moves you to a new phone ("Use on another device"). For a TV or big screen, open the invite link with `?tv=1` on the end (join under a name like "Living room TV"); after that, `/?tv=1` shows the tank with bigger fish, rotating name tags and no buttons.
+
 In the tank: tap a fish to poke it (everyone sees it react), tap near the surface to feed, and press and hold someone's fish to remove it if you own the tank. The speaker button in the corner mutes sounds.
 
 URL options:
@@ -59,6 +61,11 @@ Database scripts (they use your `supabase login`; no keys needed):
 - `npm run db:check` runs `supabase/tests/access.sql`: an owner, a member, an outsider and a signed-out visitor try everything, inside a transaction that is rolled back.
 - `npm run check:outsider` signs in as a stranger through the public API and confirms they get zero rows and zero face images.
 - `npm run tank:new -- "Tank name"` creates a tank with a random invite code and prints its link. The code is never stored in the repo.
+
+## Keeping it running
+
+- **Keep-alive.** Supabase pauses free projects after about a week without database activity. Vercel Cron calls `/api/keepalive` every day (see `vercel.json`), which runs a real query through `keepalive()`.
+- **Backups.** `.github/workflows/backup.yml` dumps the schema and data every Sunday, encrypts them and keeps each file for 90 days (Actions → Database backup → Artifacts). It's off until you add two repository secrets: `SUPABASE_DB_URL` (Supabase → Connect → Session pooler connection string, with your database password) and `BACKUP_PASSPHRASE` (any long passphrase; keep it safe). Face photos live in Storage and aren't included. To read a backup: `gpg -d tankmates-DATE.tgz.gpg > backup.tgz && tar xzf backup.tgz`, then load `schema.sql` and `data.sql` with `psql`.
 
 ## Layout
 

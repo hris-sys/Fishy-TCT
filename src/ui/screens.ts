@@ -70,3 +70,102 @@ export function showJoin(tankName: string, onJoin: (name: string) => Promise<voi
     h('p', { class: 'note' }, 'No sign-up. This phone remembers you; clearing your browser data means joining again.'),
   )
 }
+
+/**
+ * For anyone who isn't in a tank on this device: explains it's invite-only, and offers the two ways
+ * in that don't need an invite link opened on this exact device: a code from your other device (for
+ * example Safari, when this is the iPhone Home Screen app), or pasting an invite link.
+ */
+export function showWelcome(onCode: (code: string) => Promise<void>, describe: (error: unknown) => string) {
+  const error = h('p', { class: 'form-error', role: 'alert', hidden: true })
+  const codeInput = h('input', {
+    class: 'text-input code-input',
+    type: 'text',
+    maxLength: 9,
+    placeholder: 'ABCD-EFGH',
+    autocomplete: 'one-time-code',
+    autocapitalize: 'characters',
+    spellcheck: false,
+    enterKeyHint: 'go',
+    'aria-label': 'Code from your other device',
+  })
+  const go = h('button', { type: 'submit', class: 'button primary' }, 'Continue')
+  const codeForm = h(
+    'form',
+    {
+      class: 'join-form',
+      hidden: true,
+      onsubmit: async (event: Event) => {
+        event.preventDefault()
+        const code = codeInput.value.replace(/[^A-Za-z0-9]/g, '')
+        if (code.length !== 8) {
+          error.textContent = 'The code has 8 letters and numbers.'
+          error.hidden = false
+          return
+        }
+        go.disabled = true
+        go.textContent = 'Moving you over…'
+        error.hidden = true
+        try {
+          await onCode(code)
+        } catch (failure) {
+          error.textContent = describe(failure)
+          error.hidden = false
+          go.disabled = false
+          go.textContent = 'Continue'
+        }
+      },
+    },
+    h('p', { class: 'note' }, 'On your other device, open the menu ⋯ in the tank and choose “Use on another device” or “Add to Home Screen” to get a code.'),
+    codeInput,
+    go,
+  )
+
+  const linkInput = h('input', {
+    class: 'text-input',
+    type: 'url',
+    placeholder: 'Paste the invite link',
+    autocomplete: 'off',
+    enterKeyHint: 'go',
+    'aria-label': 'Invite link',
+  })
+  const linkForm = h(
+    'form',
+    {
+      class: 'join-form',
+      hidden: true,
+      onsubmit: (event: Event) => {
+        event.preventDefault()
+        const code = linkInput.value.trim().match(/(?:\/join\/)?([A-Za-z0-9-]{6,64})\/?(?:[?#].*)?$/)?.[1]
+        if (!code) {
+          error.textContent = 'That doesn’t look like an invite link.'
+          error.hidden = false
+          return
+        }
+        location.href = `/join/${code}${location.search}`
+      },
+    },
+    linkInput,
+    h('button', { type: 'submit', class: 'button primary' }, 'Open invite'),
+  )
+
+  const showForm = (form: HTMLElement, other: HTMLElement, input: HTMLInputElement) => {
+    form.hidden = false
+    other.hidden = true
+    error.hidden = true
+    input.focus()
+  }
+  gate(
+    h('h1', {}, 'Tankmates is invite\u2011only'),
+    h('p', {}, 'Open the invite link from your group on this device, or:'),
+    h(
+      'div',
+      { class: 'stack' },
+      h('button', { type: 'button', class: 'button', onclick: () => showForm(codeForm, linkForm, codeInput) }, 'I have a code'),
+      h('button', { type: 'button', class: 'button', onclick: () => showForm(linkForm, codeForm, linkInput) }, 'Paste an invite link'),
+    ),
+    codeForm,
+    linkForm,
+    error,
+  )
+}

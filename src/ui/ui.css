@@ -554,3 +554,172 @@
   border: 2px solid rgba(255, 255, 255, 0.6);
   border-radius: 50%;
 }
+
+/* Menu button (top right) and its sheet. */
+.menu-button {
+  position: fixed;
+  top: calc(env(safe-area-inset-top) + 10px);
+  right: calc(env(safe-area-inset-right) + 10px);
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: rgba(4, 26, 46, 0.55);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.menu-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 8px;
+}
+
+.menu-body .note,
+.menu-text {
+  margin: 4px 0 0;
+  color: var(--ink-soft);
+  font-size: 14px;
+  line-height: 1.45;
+  text-align: center;
+}
+
+.menu-text {
+  font-size: 16px;
+}
+
+.steps {
+  margin: 0;
+  padding-left: 22px;
+  color: var(--ink);
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.steps li + li {
+  margin-top: 10px;
+}
+
+.steps .icon {
+  width: 18px;
+  height: 18px;
+  vertical-align: -3px;
+}
+
+.code-box {
+  padding: 16px;
+  border: 1px dashed rgba(255, 255, 255, 0.35);
+  border-radius: 16px;
+  background: var(--fill);
+  text-align: center;
+}
+
+.device-code {
+  margin: 0;
+  font: 700 34px/1.2 ui-monospace, Menlo, monospace;
+  letter-spacing: 0.08em;
+  color: var(--ink);
+  -webkit-user-select: all;
+  user-select: all;
+}
+
+.code-input {
+  text-align: center;
+  font: 700 22px ui-monospace, Menlo, monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* TV mode: nothing but the tank. */
+body.tv {
+  cursor: none;
+}
+
+/* Live camera. */
+.camera-stage {
+  position: relative;
+  width: min(100%, 52vh);
+  aspect-ratio: 1;
+  margin: auto;
+  overflow: hidden;
+  border-radius: 18px;
+  background: #020f1c;
+}
+
+.camera-stage.off {
+  opacity: 0.4;
+}
+
+.camera-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /* Mirrored, like a mirror. The captured photo matches what's shown. */
+  transform: scaleX(-1);
+}
+
+.camera-guide,
+.camera-guide svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.countdown {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font: 800 120px/1 var(--ui-font);
+  text-shadow: 0 6px 30px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+}
+
+.countdown.tick {
+  animation: count-pop 0.8s ease-out;
+}
+
+@keyframes count-pop {
+  from {
+    opacity: 0;
+    transform: scale(1.6);
+  }
+  30% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0.2;
+  }
+}
+
+.camera-flash {
+  position: absolute;
+  inset: 0;
+  background: #fff;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.camera-flash.on {
+  animation: flash 0.35s ease-out;
+}
+
+@keyframes flash {
+  from {
+    opacity: 0.9;
+  }
+  to {
+    opacity: 0;
+  }
+}

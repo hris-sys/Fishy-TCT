@@ -153,6 +153,44 @@ insert into public.fish (tank_id, owner_id, name, species, face_path)
 values ('11111111-1111-4111-8111-111111111111', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'Alfie 2', 'shark',
         '11111111-1111-4111-8111-111111111111/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/two.webp');
 
+-- B moves to a new device (C, still an outsider) with a one-time code.
+reset role;
+set local request.jwt.claims = '{"sub": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", "role": "authenticated"}';
+set local role authenticated;
+insert into public.fish (tank_id, owner_id, name, species, face_path)
+values ('11111111-1111-4111-8111-111111111111', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'Bubbles 2', 'pufferfish',
+        '11111111-1111-4111-8111-111111111111/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/two.webp');
+insert into storage.objects (bucket_id, name)
+values ('faces', '11111111-1111-4111-8111-111111111111/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/two.webp');
+select set_config('access_test.code', public.create_device_code(), true);
+
+reset role;
+set local request.jwt.claims = '{"sub": "cccccccc-cccc-4ccc-8ccc-cccccccccccc", "role": "authenticated"}';
+set local role authenticated;
+select access_test.expect_error($$select public.claim_device_code('WRONGCOD')$$, 'a wrong device code is refused');
+select access_test.expect(public.claim_device_code(lower(current_setting('access_test.code'))) = 1, 'a device code moves your tank to the new device');
+select access_test.expect((select count(*) from public.fish where owner_id = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc' and deleted_at is null) = 1, 'your fish comes along');
+select access_test.expect((select display_name from public.my_tanks()) = 'Bea B', 'your name comes along');
+select access_test.expect_error($$select public.claim_device_code(current_setting('access_test.code'))$$, 'a device code works only once');
+update public.fish set name = 'Moved' where owner_id = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+select access_test.expect((select name from public.fish where owner_id = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc' and deleted_at is null) = 'Moved', 'the moved fish can be edited, its face staying put');
+select access_test.expect_error($$update public.fish set face_path = '11111111-1111-4111-8111-111111111111/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/one.webp' where owner_id = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'$$,
+  'nobody points their fish at someone else''s face');
+with gone as (delete from storage.objects where name = '11111111-1111-4111-8111-111111111111/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/two.webp' returning 1)
+select access_test.expect((select count(*) from gone) = 1, 'the new device can tidy up face files left in the old one''s folder');
+
+reset role;
+set local request.jwt.claims = '{"sub": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", "role": "authenticated"}';
+set local role authenticated;
+select access_test.expect((select count(*) from public.my_tanks()) = 0, 'the old device is no longer in the tank');
+select access_test.expect((select count(*) from public.fish) = 0, 'the old device sees no fish any more');
+select access_test.expect_error($$select public.create_device_code()$$, 'only members can make device codes');
+
+-- The keep-alive works without signing in.
+reset role;
+set local role anon;
+select access_test.expect(public.keepalive(), 'the keep-alive query works without signing in');
+
 reset role;
 select 'all access checks passed' as result;
 

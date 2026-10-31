@@ -1,0 +1,58 @@
+# Weekly database backup, encrypted (this repo is public, and the data includes invite codes).
+#
+# Turn it on by adding two repository secrets (Settings → Secrets and variables → Actions):
+#   SUPABASE_DB_URL     the "Session pooler" connection string from Supabase → Connect, with your
+#                       database password filled in
+#   BACKUP_PASSPHRASE   any long passphrase; you need it to decrypt a backup, so keep it somewhere safe
+#
+# Each run keeps one encrypted file for 90 days under Actions → this workflow → Artifacts.
+# Face photos live in Storage and aren't in the dump.
+name: Database backup
+
+on:
+  schedule:
+    - cron: '23 3 * * 0'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+    steps:
+      - name: Check the secrets are set
+        id: check
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ] || [ -z "$BACKUP_PASSPHRASE" ]; then
+            echo "::notice::Backups are off. Add the SUPABASE_DB_URL and BACKUP_PASSPHRASE repository secrets to turn them on."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Dump the schema and data
+        if: steps.check.outputs.ready == 'true'
+        run: |
+          npx --yes supabase@2.122.0 db dump --db-url "$SUPABASE_DB_URL" -f schema.sql
+          npx --yes supabase@2.122.0 db dump --db-url "$SUPABASE_DB_URL" --data-only -f data.sql
+
+      - name: Encrypt
+        if: steps.check.outputs.ready == 'true'
+        run: |
+          tar czf backup.tgz schema.sql data.sql
+          gpg --batch --yes --pinentry-mode loopback --passphrase "$BACKUP_PASSPHRASE" \
+            --symmetric --cipher-algo AES256 -o "tankmates-$(date -u +%F).tgz.gpg" backup.tgz
+          rm -f schema.sql data.sql backup.tgz
+
+      - name: Keep the encrypted backup
+        if: steps.check.outputs.ready == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tankmates-backup-${{ github.run_id }}
+          path: tankmates-*.tgz.gpg
+          retention-days: 90
+          if-no-files-found: error

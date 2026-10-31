@@ -83,6 +83,7 @@ export function createFishLayer(
   effects: Effects,
   food: Food,
   sound: (name: TankSound, detail?: string) => void,
+  fishZoom = 1,
 ): FishLayer {
   const glowTexture = Texture.from(drawGlow())
   const view = new Container()
@@ -134,6 +135,7 @@ export function createFishLayer(
       for (const fish of resident.fish) fish.school = school
     }
     for (const fish of resident.fish) {
+      fish.zoom = fishZoom
       // Big fish swim behind small ones.
       fish.view.zIndex = -kind.body.width * kind.body.height * kind.config.scale ** 2
       allFish.push(fish)

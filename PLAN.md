@@ -206,12 +206,15 @@ _Headless end-to-end with two browsers against the real project: a poke reached 
 
 Goal: it still works in three months without babysitting.
 
-- [ ] Web app manifest and icons for home-screen install.
-- [ ] TV mode (`?tv=1`): no UI, rotating name tags, bigger fish.
-- [ ] Live camera with getUserMedia, the oval overlay and a 3-2-1 countdown, keeping file upload as the fallback.
-- [ ] Error states for camera denied, upload failed and a bad invite link.
-- [ ] A daily keep-alive job that runs a real database query, plus a regular `pg_dump` backup.
-- [ ] Stress test with 30 fish, and pack the species art into a texture atlas.
+- [x] Web app manifest and icons for home-screen install.
+- [x] TV mode (`?tv=1`): no UI, rotating name tags, bigger fish.
+- [x] Live camera with getUserMedia, the oval overlay and a 3-2-1 countdown, keeping file upload as the fallback.
+- [x] Error states for camera denied, upload failed and a bad invite link.
+- [x] A daily keep-alive job that runs a real database query, plus a regular `pg_dump` backup.
+- [x] Stress test with 30 fish, and pack the species art into a texture atlas.
+- [x] Added: moving to another device. An iPhone Home Screen app has its own storage, separate from Safari, so it starts signed out. A one-time 8-character code (menu → Add to Home Screen / Use on another device) moves your membership, ownership and fish to the new device. The same fixes the "switching phones loses your fish" gotcha.
+
+_Keep-alive: Vercel Cron calls `/api/keepalive` daily, which runs `keepalive()` (a real count on `fish`) through the public API; GitHub's scheduled jobs would stop after 60 days without commits. Backups: a weekly GitHub Actions job dumps schema and data, encrypts them with a passphrase (the repo is public) and keeps them 90 days; it needs the `SUPABASE_DB_URL` and `BACKUP_PASSPHRASE` secrets. Stress test: 30 people (66 fish) take ~0.5 ms per frame to simulate, with no escapes; body and tail art come from one 2048×1024 atlas._
 
 **Done when:** it installs on iOS and Android, survives a week of nobody opening it, and a new friend joins without you explaining anything.
 

@@ -84,22 +84,28 @@ export function openFishSheet(options: FishSheetOptions) {
       h('button', { type: 'button', class: 'icon-button', 'aria-label': 'Close', onclick: close }, icon('close')),
     )
 
-  // Step 1: a selfie or a photo from the library. On phones, capture="user" opens the front camera.
+  /** A button that opens the photo library, or the phone's own camera app with capture="user". */
+  const pick = (label: string, iconName: 'camera' | 'image', selfie: boolean, kind: PhotoKind, primary = selfie) => {
+    const input = h('input', {
+      type: 'file',
+      accept: 'image/*',
+      capture: selfie ? 'user' : undefined,
+      class: 'visually-hidden',
+      onchange: () => {
+        const file = input.files?.[0]
+        input.value = ''
+        if (file) choose(file, kind)
+      },
+    })
+    return h('label', { class: primary ? 'button primary big' : 'button big' }, input, icon(iconName), label)
+  }
+
+  // Step 1: a selfie or a photo from the library. Where the browser allows it (HTTPS), the selfie
+  // uses the live camera with a countdown; otherwise the phone's camera app.
   function photoStep(error?: string, kind: PhotoKind = 'face') {
-    const pick = (label: string, iconName: 'camera' | 'image', selfie: boolean) => {
-      const input = h('input', {
-        type: 'file',
-        accept: 'image/*',
-        capture: selfie ? 'user' : undefined,
-        class: 'visually-hidden',
-        onchange: () => {
-          const file = input.files?.[0]
-          input.value = ''
-          if (file) choose(file, kind)
-        },
-      })
-      return h('label', { class: selfie ? 'button primary big' : 'button big' }, input, icon(iconName), label)
-    }
+    const selfie = canUseCamera()
+      ? h('button', { type: 'button', class: 'button primary big', onclick: () => cameraStep(kind) }, icon('camera'), 'Take a selfie')
+      : pick('Take a selfie', 'camera', true, kind)
     const back = face ? () => speciesStep() : undefined
     const blubbing = kind === 'blub'
     show(
@@ -119,7 +125,7 @@ export function openFishSheet(options: FishSheetOptions) {
               : 'Your face goes on a fish. Use a clear photo, looking straight at the camera.',
           ),
           error ? h('p', { class: 'error', role: 'alert' }, error) : null,
-          h('div', { class: 'stack' }, pick('Take a selfie', 'camera', true), pick('Choose a photo', 'image', false)),
+          h('div', { class: 'stack' }, selfie, pick('Choose a photo', 'image', false, kind)),
           h('p', { class: 'note' }, 'Only a small square around your face is kept. The original photo never leaves your phone.'),
         ),
       ),
@@ -136,6 +142,81 @@ export function openFishSheet(options: FishSheetOptions) {
     } catch {
       photoStep('That photo could not be opened. Try a JPEG or PNG, or take a selfie.', kind)
     }
+  }
+
+  // Step 1b: the live camera, mirrored like a mirror, with the oval guide and a 3-2-1 countdown.
+  function cameraStep(kind: PhotoKind) {
+    const video = h('video', { class: 'camera-video', autoplay: true, playsInline: true, muted: true })
+    const count = h('div', { class: 'countdown', hidden: true, 'aria-live': 'assertive' })
+    const flash = h('div', { class: 'camera-flash' })
+    const guide = document.createElement('div')
+    guide.className = 'camera-guide'
+    guide.innerHTML =
+      '<svg viewBox="0 0 100 100" preserveAspectRatio="none"><path fill="rgba(2,16,30,0.45)" fill-rule="evenodd" d="M0 0H100V100H0Z M14 50a36 45 0 1 0 72 0a36 45 0 1 0 -72 0Z"/><ellipse cx="50" cy="50" rx="36" ry="45" fill="none" stroke="white" stroke-width="0.8" vector-effect="non-scaling-stroke"/></svg>'
+    const stage = h('div', { class: 'camera-stage' }, video, guide, count, flash)
+    const message = h('p', { class: 'form-error', role: 'alert', hidden: true })
+    const shoot = h('button', { type: 'button', class: 'button primary', disabled: true }, icon('camera'), 'Take photo')
+    let stream: MediaStream | null = null
+    let left = false
+    const stop = () => {
+      left = true
+      stream?.getTracks().forEach((track) => track.stop())
+      stream = null
+    }
+
+    show(
+      h(
+        'div',
+        { class: 'step' },
+        header(kind === 'blub' ? 'Blub face' : 'Take a selfie', () => photoStep(undefined, kind)),
+        stage,
+        h(
+          'div',
+          { class: 'step-footer' },
+          h('p', { class: 'hint' }, kind === 'blub' ? 'Make an “O” with your mouth and fit your face in the oval.' : 'Fit your face in the oval and look at the camera.'),
+          message,
+          shoot,
+          pick('Choose a photo instead', 'image', false, kind),
+        ),
+      ),
+      stop,
+    )
+
+    navigator.mediaDevices
+      .getUserMedia({ video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 1280 } }, audio: false })
+      .then(async (media) => {
+        if (left) return media.getTracks().forEach((track) => track.stop())
+        stream = media
+        video.srcObject = media
+        await video.play()
+        shoot.disabled = false
+      })
+      .catch((error) => {
+        message.textContent = cameraError(error)
+        message.hidden = false
+        shoot.hidden = true
+        stage.classList.add('off')
+      })
+
+    shoot.addEventListener('click', async () => {
+      shoot.disabled = true
+      for (const n of [3, 2, 1]) {
+        count.textContent = String(n)
+        count.hidden = false
+        count.classList.remove('tick')
+        void count.offsetWidth
+        count.classList.add('tick')
+        await new Promise((resolve) => setTimeout(resolve, 800))
+        if (left) return
+      }
+      count.hidden = true
+      flash.classList.add('on')
+      const photo = captureSquare(video)
+      stop()
+      cropper?.cropper.destroy()
+      cropper = { photo, cropper: createCropper(photo), kind }
+      cropStep(kind)
+    })
   }
 
   // Step 2: line up the face in the oval.
@@ -295,4 +376,31 @@ export function openFishSheet(options: FishSheetOptions) {
 
   if (face) speciesStep()
   else photoStep()
+}
+
+const canUseCamera = () => window.isSecureContext && Boolean(navigator.mediaDevices?.getUserMedia)
+
+/** The square the camera stage shows (the middle of the video), mirrored as it was on screen. */
+function captureSquare(video: HTMLVideoElement): HTMLCanvasElement {
+  const width = video.videoWidth
+  const height = video.videoHeight
+  const side = Math.min(width, height)
+  const size = Math.min(side, 2048)
+  const canvas = document.createElement('canvas')
+  canvas.width = canvas.height = size
+  const ctx = canvas.getContext('2d')!
+  ctx.translate(size, 0)
+  ctx.scale(-1, 1)
+  ctx.drawImage(video, (width - side) / 2, (height - side) / 2, side, side, 0, 0, size, size)
+  return canvas
+}
+
+function cameraError(error: unknown) {
+  const name = (error as Error | null)?.name
+  if (name === 'NotAllowedError' || name === 'SecurityError') {
+    return 'Camera access is blocked. Allow the camera for this site in your browser’s settings, or choose a photo instead.'
+  }
+  if (name === 'NotFoundError' || name === 'OverconstrainedError') return 'No front camera was found. You can choose a photo instead.'
+  if (name === 'NotReadableError') return 'The camera is busy in another app. Close it and try again, or choose a photo instead.'
+  return 'The camera couldn’t start. You can choose a photo instead.'
 }

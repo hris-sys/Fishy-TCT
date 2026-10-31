@@ -170,6 +170,13 @@ export function describeError(error: unknown): string {
   const e = error as { code?: string; message?: string } | null
   if (e?.message?.includes('Missing VITE_SUPABASE')) return 'This copy of the app isn’t connected to its database: the Supabase settings are missing from the build.'
   if (e?.message?.toLowerCase().includes('captcha')) return 'Supabase is asking for a CAPTCHA, which this app doesn’t show. Turn off CAPTCHA protection in Supabase (Authentication → Attack Protection).'
+  const name = (error as { name?: string } | null)?.name
+  const message = e?.message?.toLowerCase() ?? ''
+  if (message.includes('code is wrong')) return 'That code is wrong or has expired. Make a new one on your other device.'
+  if (message.includes('join a tank first')) return 'Join a tank on this device first.'
+  if (message.includes('maximum allowed size') || message.includes('payload too large')) return 'That photo is too large to upload. Please try another one.'
+  if (message.includes('mime type')) return 'That kind of photo can’t be uploaded. Please try a JPEG or PNG.'
+  if (name === 'StorageUnknownError' || name === 'StorageApiError') return 'The photo couldn’t be uploaded. Check your connection and try again.'
   if (e?.code === '23505') return 'You already have a fish in this tank.'
   if (e?.code === 'P0002') return 'This invite link is not valid.'
   if (e?.code === '42501') return 'You are not allowed to do that.'

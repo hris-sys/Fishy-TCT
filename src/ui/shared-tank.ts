@@ -1,16 +1,25 @@
 import { type FishRecord, createFish, describeError, errorDetail, listFish, loadFace, removeFish, signFaceUrls, updateFish } from '../data/fish'
 import { type LiveTank, connectTank } from '../data/live'
+import { claimDeviceCode } from '../data/devices'
 import { currentUserId, ensureSignedIn } from '../data/session'
 import { type MyTank, inviteTankName, joinTank, myTanks } from '../data/tanks'
 import { species } from '../species'
 import type { ResidentInput, Tank } from '../tank'
 import { openFishSheet } from './add-fish'
 import { h, icon } from './dom'
-import { showJoin, showLoading, showMessage } from './screens'
+import { createMenu } from './menu'
+import { showJoin, showLoading, showMessage, showWelcome } from './screens'
 import { FEED_ZONE, type TankHandlers } from './handlers'
 import { toast } from './toast'
 
 const HINT_KEY = 'tankmates-hint-play'
+/** TV mode: seconds between name tags, which take turns so everyone gets introduced. */
+const TV_TAG_SECONDS = 4.5
+
+export interface SharedOptions {
+  /** TV mode: no buttons or messages, rotating name tags, the screen kept awake. */
+  tv: boolean
+}
 
 /** One fish's photos: the face, and the optional blub face. */
 interface Faces {
@@ -27,7 +36,7 @@ function forgetInvite() {
  * Decides where you land: the invite page, straight into your tank, or a polite "invite only".
  * `handlers` is filled in with what taps should do once you're in.
  */
-export async function startShared(tank: Tank, invite: string | null, handlers: TankHandlers) {
+export async function startShared(tank: Tank, invite: string | null, handlers: TankHandlers, options: SharedOptions) {
   const loading = showLoading('Opening the tank…')
   try {
     // Only invited visitors get signed in; anyone else isn't worth an account.
@@ -39,7 +48,7 @@ export async function startShared(tank: Tank, invite: string | null, handlers: T
       const already = tanks.find((info) => info.inviteCode === invite)
       if (already) {
         forgetInvite()
-        return await openTank(tank, already, userId, handlers, false)
+        return await openTank(tank, already, userId, handlers, options, false)
       }
       const name = await inviteTankName(invite)
       if (!name) {
@@ -52,16 +61,20 @@ export async function startShared(tank: Tank, invite: string | null, handlers: T
           const joined = (await myTanks()).find((info) => info.inviteCode === invite)
           if (!joined) throw new Error('Joined, but the tank could not be opened')
           forgetInvite()
-          await openTank(tank, joined, userId, handlers, true)
+          await openTank(tank, joined, userId, handlers, options, !options.tv)
         },
         describeError,
       )
     }
 
     if (!userId || tanks.length === 0) {
-      return showMessage('Tankmates is invite\u2011only', 'Ask a friend in your group for the invite link, then open it on this phone.')
+      return showWelcome(async (code) => {
+        await ensureSignedIn()
+        await claimDeviceCode(code)
+        location.replace(`/${location.search}`)
+      }, describeError)
     }
-    await openTank(tank, tanks[0], userId, handlers, false)
+    await openTank(tank, tanks[0], userId, handlers, options, false)
   } catch (error) {
     loading.remove()
     console.error(error)
@@ -73,7 +86,7 @@ export async function startShared(tank: Tank, invite: string | null, handlers: T
  * Loads everyone's fish into the tank, keeps it live (new, changed and removed fish; who's online),
  * and wires up adding, editing and removing.
  */
-async function openTank(tank: Tank, info: MyTank, userId: string, handlers: TankHandlers, addRightAway: boolean) {
+async function openTank(tank: Tank, info: MyTank, userId: string, handlers: TankHandlers, options: SharedOptions, addRightAway: boolean) {
   const records = new Map<string, FishRecord>()
   const faces = new Map<string, Faces>()
   /** Who's online, by user id. Null until the first presence update: until then, nobody sleeps. */
@@ -121,7 +134,7 @@ async function openTank(tank: Tank, info: MyTank, userId: string, handlers: Tank
   const button = h('button', { type: 'button', class: 'add-fish', onclick: () => openSheet() })
   const refreshButton = () => button.replaceChildren(icon(mine ? 'fish' : 'plus'), mine ? 'Your fish' : 'Add your fish')
   refreshButton()
-  document.body.append(button)
+  if (!options.tv) document.body.append(button)
 
   /** Removed fish swim off-screen. */
   function forget(id: string) {
@@ -159,6 +172,15 @@ async function openTank(tank: Tank, info: MyTank, userId: string, handlers: Tank
     // Our own saves already applied this change; older events are stale.
     if (Date.parse(record.updatedAt) <= Date.parse(known.updatedAt)) return
     records.set(record.id, record)
+    // A fish can change owner when someone moves to another device.
+    if (record.ownerId !== known.ownerId) {
+      tank.setAsleep(record.id, !isOnline(record.ownerId))
+      if (mine?.id === record.id && record.ownerId !== userId) {
+        mine = null
+        refreshButton()
+        if (!options.tv) toast('Your fish moved to your other device')
+      }
+    }
     const changes: Partial<Omit<ResidentInput, 'id'>> = { name: record.name, species: record.species, tint: record.tint }
     if (record.facePath !== known.facePath || record.faceBlubPath !== known.faceBlubPath) {
       const photos = await photosFor(record)
@@ -204,7 +226,7 @@ async function openTank(tank: Tank, info: MyTank, userId: string, handlers: Tank
         const record = records.get(fishId)
         if (!record) return
         tank.react(fishId)
-        toast(record.ownerId === userId ? `${by} poked your fish` : `${by} poked ${record.name}`)
+        if (!options.tv) toast(record.ownerId === userId ? `${by} poked your fish` : `${by} poked ${record.name}`)
       },
       feed: ({ x, seed }) => tank.feed(x, seed),
     })
@@ -327,6 +349,19 @@ async function openTank(tank: Tank, info: MyTank, userId: string, handlers: Tank
     })
   }
 
+  if (options.tv) {
+    startTvMode(tank, () => [...records.keys()])
+    return
+  }
+
+  // The menu: invite a friend, add to the home screen, move to another device.
+  const menu = createMenu(info, (open) => {
+    tank.setPaused(open)
+    button.hidden = open
+    actions.hide()
+  })
+  document.body.append(menu.button)
+
   if (addRightAway && !mine) openSheet()
   else showPlayHint()
 }
@@ -402,4 +437,23 @@ function showPlayHint() {
     return
   }
   window.setTimeout(() => toast('Tap a fish to poke it · tap near the surface to feed everyone', 5000), 1200)
+}
+
+/** TV mode: a name tag every few seconds, taking turns, and the screen kept awake. */
+function startTvMode(tank: Tank, ids: () => string[]) {
+  document.body.classList.add('tv')
+  let turn = 0
+  window.setInterval(() => {
+    const all = ids()
+    if (all.length === 0) return
+    tank.showTag(all[turn++ % all.length])
+  }, TV_TAG_SECONDS * 1000)
+
+  // Ask the screen not to dim. The lock is dropped whenever the page is hidden, so ask again.
+  const keepAwake = () => {
+    if (document.hidden) return
+    navigator.wakeLock?.request('screen').catch(() => {})
+  }
+  keepAwake()
+  document.addEventListener('visibilitychange', keepAwake)
 }

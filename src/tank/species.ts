@@ -1,5 +1,5 @@
-import type { Texture } from 'pixi.js'
-import { canvasTexture, makeCanvas } from './util'
+import { CanvasSource, Rectangle, Texture } from 'pixi.js'
+import { makeCanvas } from './util'
 
 /**
  * Mask shapes, in the face slot's own space. Oval sizes are fractions of the slot (1 = full width);
@@ -71,7 +71,11 @@ export interface LoadedSpecies {
 /** Art is rasterized at this multiple of its size, so it stays sharp on big screens. */
 const ART_RESOLUTION = 3
 
-async function loadArt(src: string): Promise<Texture> {
+/** Room around each picture in the atlas, so the smaller mipmap levels don't bleed into neighbours. */
+const ATLAS_PADDING = 16
+const ATLAS_WIDTH = 2048
+
+async function rasterize(src: string): Promise<HTMLCanvasElement> {
   const image = new Image()
   image.src = src
   await image.decode()
@@ -80,14 +84,50 @@ async function loadArt(src: string): Promise<Texture> {
     Math.ceil(image.naturalHeight * ART_RESOLUTION),
   )
   ctx.drawImage(image, 0, 0, canvas.width, canvas.height)
-  return canvasTexture(canvas, ART_RESOLUTION)
+  return canvas
 }
 
+/** Packs pictures into rows of one big canvas, tallest first. Returns where each one went. */
+function packAtlas(pictures: HTMLCanvasElement[]) {
+  const spots = new Map<HTMLCanvasElement, { x: number; y: number }>()
+  let x = ATLAS_PADDING
+  let y = ATLAS_PADDING
+  let rowHeight = 0
+  for (const picture of [...pictures].sort((a, b) => b.height - a.height)) {
+    if (x + picture.width + ATLAS_PADDING > ATLAS_WIDTH) {
+      x = ATLAS_PADDING
+      y += rowHeight + ATLAS_PADDING
+      rowHeight = 0
+    }
+    spots.set(picture, { x, y })
+    x += picture.width + ATLAS_PADDING
+    rowHeight = Math.max(rowHeight, picture.height)
+  }
+  const height = 2 ** Math.ceil(Math.log2(y + rowHeight + ATLAS_PADDING))
+  const { canvas, ctx } = makeCanvas(ATLAS_WIDTH, height)
+  for (const [picture, spot] of spots) ctx.drawImage(picture, spot.x, spot.y)
+  return { canvas, spots }
+}
+
+/**
+ * Loads every species' body and tail art into one texture atlas, so all fish draw from a single
+ * image on the GPU instead of ten.
+ */
 export async function loadSpecies(configs: SpeciesConfig[]): Promise<LoadedSpecies[]> {
-  return Promise.all(
+  const art = await Promise.all(
     configs.map(async (config) => {
-      const [body, tail] = await Promise.all([loadArt(config.body), loadArt(config.tail.src)])
+      const [body, tail] = await Promise.all([rasterize(config.body), rasterize(config.tail.src)])
       return { config, body, tail }
     }),
   )
+  const { canvas, spots } = packAtlas(art.flatMap(({ body, tail }) => [body, tail]))
+  const source = new CanvasSource({ resource: canvas, resolution: ART_RESOLUTION, autoGenerateMipmaps: true })
+  const frame = (picture: HTMLCanvasElement) => {
+    const spot = spots.get(picture)!
+    return new Texture({
+      source,
+      frame: new Rectangle(spot.x / ART_RESOLUTION, spot.y / ART_RESOLUTION, picture.width / ART_RESOLUTION, picture.height / ART_RESOLUTION),
+    })
+  }
+  return art.map(({ config, body, tail }) => ({ config, body: frame(body), tail: frame(tail) }))
 }

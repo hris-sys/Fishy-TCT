@@ -5,6 +5,7 @@ import { type Tank, createTank } from './tank'
 import { openFishSheet } from './ui/add-fish'
 import { h, icon, randomId } from './ui/dom'
 import { FEED_ZONE, type TankHandlers } from './ui/handlers'
+import { listenForInstallPrompt } from './ui/install'
 import { createMuteButton, createSound } from './ui/sound'
 import { showStats } from './ui/stats'
 
@@ -13,12 +14,15 @@ const params = new URLSearchParams(location.search)
 const debug = params.has('debug')
 /** ?demo: the tank on this phone only, with stand-in fish and nothing saved. */
 const demo = params.has('demo')
+/** ?tv=1: for a TV or a big screen: no buttons, bigger fish, rotating name tags. */
+const tv = params.has('tv') && params.get('tv') !== '0'
 const placeholderParam = Number(params.get('fish'))
 const placeholders = Number.isFinite(placeholderParam) && params.has('fish') ? placeholderParam : demo ? 10 : 0
 const invite = location.pathname.match(/^\/join\/([A-Za-z0-9-]{6,64})\/?$/)?.[1] ?? null
 
 // Taps go to whichever mode is running; it fills these in.
 const handlers: TankHandlers = {}
+listenForInstallPrompt()
 const sound = createSound()
 
 try {
@@ -30,8 +34,10 @@ try {
     onFishLongPress: (id) => handlers.fishLongPress?.(id),
     onWaterTap: (x, y) => handlers.waterTap?.(x, y),
     onSound: (name, detail) => sound.play(name, detail),
+    fishZoom: tv ? 1.6 : 1,
+    interactive: !tv,
   })
-  document.body.append(createMuteButton(sound))
+  if (!tv) document.body.append(createMuteButton(sound))
   if (debug) {
     showStats(tank)
     const { showDebugPanel } = await import('./ui/debug-panel')
@@ -40,7 +46,7 @@ try {
   if (demo) startDemo(tank)
   else {
     const { startShared } = await import('./ui/shared-tank')
-    await startShared(tank, invite, handlers)
+    await startShared(tank, invite, handlers, { tv })
   }
 } catch (error) {
   console.error(error)

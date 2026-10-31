@@ -76,6 +76,8 @@ export class Fish {
   blub = 0
   /** Seconds left of a chomp, after eating a flake. */
   chomp = 0
+  /** Extra size for this fish only (TV mode shows bigger fish without bigger scenery). */
+  zoom = 1
 
   private readonly flip = new Container()
   private readonly tail: Sprite
@@ -142,11 +144,11 @@ export class Fish {
   /** Half the fish's on-screen length, tail included, in px. */
   halfWidth(worldScale: number) {
     const { front, back } = this.reach()
-    return ((front + back) / 2) * this.config.scale * worldScale
+    return ((front + back) / 2) * this.config.scale * this.zoom * worldScale
   }
 
   halfHeight(worldScale: number) {
-    return this.body.texture.height * 0.5 * this.config.scale * worldScale
+    return this.body.texture.height * 0.5 * this.config.scale * this.zoom * worldScale
   }
 
   /** Rough size for keeping fish apart, in px. */
@@ -160,7 +162,7 @@ export class Fish {
    */
   extents(worldScale: number) {
     const { front, back } = this.reach()
-    const s = this.config.scale * worldScale
+    const s = this.config.scale * this.zoom * worldScale
     // A tilted fish sticks out a little further sideways.
     const tilt = Math.abs(Math.sin(this.pitch)) * this.body.texture.height * 0.5 * s
     const f = Math.abs(this.flipX)
@@ -172,7 +174,7 @@ export class Fish {
   /** Like `extents`, but for the direction the fish is turning toward. Used to start turning early. */
   targetExtents(worldScale: number) {
     const { front, back } = this.reach()
-    const s = this.config.scale * worldScale
+    const s = this.config.scale * this.zoom * worldScale
     return this.facing === 1 ? { left: back * s, right: front * s } : { left: front * s, right: back * s }
   }
 
@@ -270,7 +272,7 @@ export class Fish {
     this.view.visible = !this.entering || this.entering.delay <= 0
 
     this.bobPhase += dt * Math.PI * 2 * BOB_HZ
-    this.view.scale.set(this.config.scale * world.scale * grow)
+    this.view.scale.set(this.config.scale * this.zoom * world.scale * grow)
     this.view.alpha = 1 - 0.7 * this.hiding
     this.view.rotation = this.pitch
     this.view.position.set(this.x, this.y + Math.sin(this.bobPhase) * swim.bob * world.scale)

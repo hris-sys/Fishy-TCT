@@ -33,6 +33,8 @@ export interface TankOptions {
   scenery?: 'full' | 'simple'
   /** Makes everything bigger (above 1) or smaller, on top of the automatic screen-size scale. */
   zoom?: number
+  /** Makes only the fish bigger (above 1) or smaller. */
+  fishZoom?: number
   /** Tapping a fish shows its name tag. On by default. */
   interactive?: boolean
   /** Called with the owner's id when a fish is tapped. */
@@ -117,7 +119,7 @@ export async function createTank(host: HTMLElement, options: TankOptions): Promi
   const effects = createEffects()
   const food = createFood()
   const sound = (name: TankSound, detail?: string) => options.onSound?.(name, detail)
-  const fish = createFishLayer(species, effects, food, sound)
+  const fish = createFishLayer(species, effects, food, sound, options.fishZoom ?? 1)
   const tags = createNameTags()
   // Back to front. Rocks and corals come before the sand so their bases sink into it.
   const layers: SceneLayer[] =

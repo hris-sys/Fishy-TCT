@@ -1,0 +1,55 @@
+:root {
+  color-scheme: dark;
+  --water-deep: #0a2b4d;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+  background: var(--water-deep);
+}
+
+body {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #fff;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Fixed + inset tracks the visible viewport through rotation and toolbar changes. */
+#tank {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  touch-action: none;
+}
+
+#tank canvas {
+  display: block;
+}
+
+.stats {
+  position: fixed;
+  top: calc(env(safe-area-inset-top) + 8px);
+  left: calc(env(safe-area-inset-left) + 8px);
+  padding: 4px 6px;
+  border-radius: 4px;
+  background: rgb(0 0 0 / 0.45);
+  font: 12px/1.3 ui-monospace, Menlo, monospace;
+  pointer-events: none;
+}
+
+.tank-error {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  text-align: center;
+  font-size: 17px;
+}

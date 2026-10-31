@@ -169,7 +169,7 @@ Goal: send the link to the group chat. Iterations 0–3 add up to roughly two we
 
 **Done when:** three friends on different phones each add a fish via the link and all see each other after a refresh. A non-member session gets zero rows and zero images when you query the API directly.
 
-_Checks: `npm run db:check` plays owner, member, outsider and signed-out visitor in a rolled-back transaction (all pass). A headless end-to-end run with two people (join, add, refresh, owner removes, edit, remove) passed 18/18, and `npm run check:outsider` found no leaks with real faces in the bucket. Still to confirm: three friends on real phones._
+_Checks: `npm run db:check` plays owner, member, outsider and signed-out visitor in a rolled-back transaction (all pass). A headless end-to-end run with two people (join, add, refresh, owner removes, edit, remove) passed 18/18, and `npm run check:outsider` found no leaks with real faces in the bucket. Merged to main (Oct 31, 2026); the owner's own join and fish work on a real phone. Still to confirm: three friends on real phones._
 
 ## Iteration 4 · Live tank (1–2 evenings)
 

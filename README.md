@@ -17,7 +17,7 @@ npm run dev -- --host  # also reachable from your phone on the same Wi-Fi
 URL options:
 
 - `?debug` shows an FPS readout and the **Tune** panel for live species tuning. **Copy config** puts the tuned numbers on the clipboard, ready to paste into `src/species/<id>/config.ts`.
-- `?fish=30` sets how many fish swim (default 15).
+- `?fish=30` sets how many placeholder people swim (default 10). Chromis people are a school of 7 fish each.
 
 `npm run build` typechecks and builds to `dist/`. `npm run typecheck` only typechecks.
 

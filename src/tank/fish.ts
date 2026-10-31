@@ -13,6 +13,14 @@ const BOB_HZ = 0.3
 const DEEP_TINT = [150, 182, 210]
 const DEEP_TINT_STRENGTH = 0.55
 
+/** Who a fish belongs to. Shared by all of one person's fish, so an edit reaches the whole school. */
+export interface Owner {
+  id: string
+  name: string
+  /** Body colour multiplier as 0xRRGGBB, or null for the species' natural colours. */
+  tint: number | null
+}
+
 /** A group of fish wearing the same face, steering as one. */
 export interface School {
   members: Fish[]
@@ -30,6 +38,7 @@ export interface School {
 export class Fish {
   readonly view = new Container()
   readonly species: LoadedSpecies
+  readonly owner: Owner
 
   x = 0
   y = 0
@@ -45,6 +54,11 @@ export class Fish {
   school: School | null = null
   /** Small per-fish speed difference, so a school doesn't move in lockstep. */
   readonly pace = randomBetween(0.9, 1.1)
+  /**
+   * Set while the fish is dropping in from above the surface. Until `delay` runs out it is hidden;
+   * steering takes over once it has slowed down in the water.
+   */
+  entering: { delay: number; inWater: number; splashed: boolean } | null = null
 
   private readonly flip = new Container()
   private readonly tail: Sprite
@@ -59,8 +73,9 @@ export class Fish {
   private tailPhase = Math.random() * Math.PI * 2
   private bobPhase = Math.random() * Math.PI * 2
 
-  constructor(species: LoadedSpecies, face: Texture) {
+  constructor(species: LoadedSpecies, face: Texture, owner: Owner) {
     this.species = species
+    this.owner = owner
     this.tail = new Sprite(species.tail)
     this.body = new Sprite(species.body)
     this.body.anchor.set(0.5)
@@ -163,14 +178,21 @@ export class Fish {
     this.face.scale.set(Math.abs(flipX) * faceScale, faceScale)
     this.face.rotation = faceSlot.rotation * side
 
-    // Deeper water looks bluer.
+    // Deeper water looks bluer; the owner's colour choice multiplies on top.
     const depth = clamp(this.y / world.sandY, 0, 1) * DEEP_TINT_STRENGTH
-    const tint =
-      (Math.round(lerp(255, DEEP_TINT[0], depth)) << 16) |
-      (Math.round(lerp(255, DEEP_TINT[1], depth)) << 8) |
-      Math.round(lerp(255, DEEP_TINT[2], depth))
+    let r = lerp(255, DEEP_TINT[0], depth)
+    let g = lerp(255, DEEP_TINT[1], depth)
+    let b = lerp(255, DEEP_TINT[2], depth)
+    const own = this.owner.tint
+    if (own !== null) {
+      r *= ((own >> 16) & 255) / 255
+      g *= ((own >> 8) & 255) / 255
+      b *= (own & 255) / 255
+    }
+    const tint = (Math.round(r) << 16) | (Math.round(g) << 8) | Math.round(b)
     this.body.tint = tint
     this.tail.tint = tint
+    this.view.visible = !this.entering || this.entering.delay <= 0
 
     this.bobPhase += dt * Math.PI * 2 * BOB_HZ
     this.view.scale.set(this.config.scale * world.scale)

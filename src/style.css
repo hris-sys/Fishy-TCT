@@ -35,7 +35,8 @@ body {
 
 .stats {
   position: fixed;
-  bottom: calc(env(safe-area-inset-bottom) + 8px);
+  /* Above the "Add your fish" button. */
+  bottom: calc(env(safe-area-inset-bottom) + 84px);
   left: calc(env(safe-area-inset-left) + 8px);
   padding: 4px 6px;
   border-radius: 4px;

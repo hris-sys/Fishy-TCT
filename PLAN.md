@@ -141,14 +141,18 @@ _Headless soak test (5 simulated minutes, 15 people = 33 fish with three schools
 
 Goal: photo to fish entirely in the browser, no backend yet.
 
-- [ ] Two file inputs: one with `capture="user"` that opens the front camera, and one without for the photo library. No camera code yet.
-- [ ] Crop screen with the photo behind the oval guide: drag to pan, pinch or slider to zoom, live preview.
-- [ ] Export through an offscreen canvas to a 256×256 square, as WebP with a JPEG fallback. Check the blob's actual type, because some browsers silently return PNG.
-- [ ] Species picker that shows your face on all five fish in a mini-tank, plus a name (up to 16 characters) and an optional body tint.
-- [ ] Tap any fish to show its name tag.
-- [ ] Drop-in animation: the fish falls from the surface with a splash and a burst of bubbles.
+- [x] Two file inputs: one with `capture="user"` that opens the front camera, and one without for the photo library. No camera code yet.
+- [x] Crop screen with the photo behind the oval guide: drag to pan, pinch or slider to zoom, live preview.
+- [x] Export through an offscreen canvas to a 256×256 square, as WebP with a JPEG fallback. Check the blob's actual type, because some browsers silently return PNG.
+- [x] Species picker that shows your face on all five fish in a mini-tank, plus a name (up to 16 characters) and an optional body tint.
+- [x] Tap any fish to show its name tag.
+- [x] Drop-in animation: the fish falls from the surface with a splash and a burst of bubbles.
+
+_UI screens are plain TypeScript (`src/ui/`), no framework. Photos are scaled to at most 2048 px on load; the face shown in the tank is the encoded file decoded again, so it matches what will be uploaded. Nothing is saved yet: a refresh forgets your fish until iteration 3._
 
 **Done when:** a phone photo becomes a fish in under 30 s, and portrait, landscape and iPhone photos all come out upright and sit correctly in all five masks.
+
+_Headless check: portrait, landscape and a sideways-stored photo with EXIF orientation 6 all export upright as 256 px WebP; drag, wheel, slider and two-finger pinch zoom verified with real input events. Still to confirm on a real phone: the 30-second run and the front camera._
 
 ## Iteration 3 · Private, persistent, shared: the MVP (2–3 evenings)
 

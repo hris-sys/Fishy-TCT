@@ -9,8 +9,8 @@ import type { SpeciesConfig, Tank } from '../tank'
 export function showDebugPanel(tank: Tank, species: SpeciesConfig[]) {
   const pane = new Pane({ title: 'Tune', expanded: false })
 
-  const tankParams = { people: tank.fishCount() }
-  pane.addBinding(tankParams, 'people', { min: 0, max: 40, step: 1 }).on('change', (e) => tank.setFishCount(e.value))
+  const tankParams = { placeholders: tank.placeholderCount() }
+  pane.addBinding(tankParams, 'placeholders', { min: 0, max: 40, step: 1 }).on('change', (e) => tank.setPlaceholders(e.value))
 
   for (const config of species) {
     const folder = pane.addFolder({ title: config.label, expanded: false })

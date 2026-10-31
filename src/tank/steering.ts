@@ -26,8 +26,8 @@ const SCHOOL_SPREAD = 2.2
 const SCHOOL_COHESION = 1.4
 /** School members swim closer together than strangers do. */
 const SCHOOLMATE_SPACE = 0.6
-/** Schools: spring toward the school's current target depth, per second², capped at half the cruise speed. */
-const SCHOOL_DEPTH_PULL = 0.5
+/** Schools: spring toward the school's current target depth, per second², capped at the cruise speed. */
+const SCHOOL_DEPTH_PULL = 0.8
 
 /** The vertical range a fish's center may use: below the surface and above the sand. */
 export function waterColumn(fish: Fish, world: TankWorld) {
@@ -139,7 +139,7 @@ export function steer(fish: Fish, everyone: readonly Fish[], world: TankWorld, d
   // the school's current target depth.
   if (fish.school) {
     const targetY = lerp(band.top, band.bottom, fish.school.depth)
-    ay += clamp((targetY - fish.y) * SCHOOL_DEPTH_PULL, -cruise * 0.5, cruise * 0.5) * calm
+    ay += clamp((targetY - fish.y) * SCHOOL_DEPTH_PULL, -cruise, cruise) * calm
 
     let centerX = 0
     let centerY = 0

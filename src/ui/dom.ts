@@ -1,0 +1,41 @@
+type Child = Node | string | null | undefined | false
+type Props = Record<string, unknown>
+
+/**
+ * Creates an element. Props starting with "on" become event listeners, `class` sets the class
+ * name, known element properties are set directly and anything else becomes an attribute.
+ */
+export function h<K extends keyof HTMLElementTagNameMap>(tag: K, props: Props = {}, ...children: Child[]): HTMLElementTagNameMap[K] {
+  const el = document.createElement(tag)
+  for (const [key, value] of Object.entries(props)) {
+    if (value === undefined || value === null || value === false) continue
+    if (key === 'class') el.className = String(value)
+    else if (key.startsWith('on') && typeof value === 'function') el.addEventListener(key.slice(2).toLowerCase(), value as EventListener)
+    else if (key in el) (el as unknown as Record<string, unknown>)[key] = value
+    else el.setAttribute(key, value === true ? '' : String(value))
+  }
+  for (const child of children) if (child !== null && child !== undefined && child !== false) el.append(child)
+  return el
+}
+
+/** Inline SVG icons, stroked in the current text colour. */
+const ICONS = {
+  camera:
+    '<path d="M4 8.5A2.5 2.5 0 0 1 6.5 6h1.6l1.4-2h5l1.4 2h1.6A2.5 2.5 0 0 1 20 8.5v8a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 16.5z"/><circle cx="12" cy="12.5" r="3.5"/>',
+  image: '<rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><circle cx="9" cy="10" r="1.8"/><path d="m4 17 5-5 4 4 2.5-2.5L20 18"/>',
+  back: '<path d="M14.5 5 7.5 12l7 7"/>',
+  close: '<path d="m6 6 12 12M18 6 6 18"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  minus: '<path d="M5 12h14"/>',
+} as const
+
+export function icon(name: keyof typeof ICONS) {
+  const span = h('span', { class: 'icon', 'aria-hidden': 'true' })
+  span.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[name]}</svg>`
+  return span
+}
+
+/** Short random id. Works without HTTPS, unlike crypto.randomUUID (e.g. a phone on the local network). */
+export function randomId() {
+  return globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
+}

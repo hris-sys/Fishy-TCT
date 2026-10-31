@@ -1,0 +1,368 @@
+:root {
+  --ink: #f2fafe;
+  --ink-soft: rgba(242, 250, 254, 0.7);
+  --sheet: rgba(4, 26, 46, 0.88);
+  --line: rgba(255, 255, 255, 0.16);
+  --fill: rgba(255, 255, 255, 0.08);
+  --accent: #ff8a3d;
+  --accent-ink: #2b1200;
+  --ui-font: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+/* The button on the tank. */
+.add-fish {
+  position: fixed;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom) + 18px);
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 13px 22px 13px 16px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font: 650 17px/1 var(--ui-font);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35), inset 0 -2px 0 rgba(0, 0, 0, 0.12);
+  cursor: pointer;
+}
+
+.add-fish:active {
+  transform: translateX(-50%) scale(0.97);
+}
+
+/* Full-screen sheet for the flow. */
+.sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  background: var(--sheet);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  color: var(--ink);
+  font-family: var(--ui-font);
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  animation: sheet-in 0.22s ease-out;
+}
+
+@keyframes sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+
+.step {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 560px;
+  min-height: 100%;
+  margin: 0 auto;
+  padding: 0 16px 16px;
+}
+
+/* Steps whose middle part stretches to fill the screen (the crop). */
+.step.fill {
+  height: 100%;
+}
+
+.step-header {
+  display: grid;
+  grid-template-columns: 44px 1fr 44px;
+  align-items: center;
+  min-height: 56px;
+}
+
+.step-header h2 {
+  margin: 0;
+  text-align: center;
+  font: 650 18px/1.2 var(--ui-font);
+}
+
+.step-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 14px;
+  margin-top: auto;
+}
+
+.icon-button {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.icon-button:active {
+  background: var(--fill);
+}
+
+.icon {
+  display: inline-flex;
+  width: 22px;
+  height: 22px;
+}
+
+.icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 54px;
+  padding: 0 22px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--fill);
+  color: var(--ink);
+  font: 650 17px/1 var(--ui-font);
+  cursor: pointer;
+}
+
+.button.primary {
+  border-color: transparent;
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.button:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Step 1 */
+.intro {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 14px;
+  padding-bottom: 40px;
+  text-align: center;
+}
+
+.intro h1 {
+  margin: 0;
+  font: 750 30px/1.1 var(--ui-font);
+  letter-spacing: -0.01em;
+}
+
+.intro p {
+  margin: 0 auto;
+  max-width: 34ch;
+  color: var(--ink-soft);
+  font-size: 16px;
+  line-height: 1.45;
+}
+
+.intro .note {
+  font-size: 13px;
+}
+
+.intro .error {
+  color: #ffc1b3;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 10px 0 4px;
+}
+
+.loading {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  color: var(--ink-soft);
+}
+
+/* Step 2 */
+.crop {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+}
+
+.crop-stage {
+  position: relative;
+  flex: 1;
+  min-height: 220px;
+  overflow: hidden;
+  border-radius: 18px;
+  background: #020f1c;
+  touch-action: none;
+  cursor: grab;
+}
+
+.crop-photo {
+  position: absolute;
+  left: 0;
+  top: 0;
+  max-width: none;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+.crop-mask {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.crop-preview {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 64px;
+  height: 64px;
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+}
+
+.zoom {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.zoom input {
+  flex: 1;
+  accent-color: var(--accent);
+}
+
+.hint {
+  margin: 0;
+  text-align: center;
+  color: var(--ink-soft);
+  font-size: 14px;
+}
+
+/* Step 3 */
+.mini-tank {
+  position: relative;
+  height: clamp(190px, 36vh, 320px);
+  overflow: hidden;
+  border-radius: 18px;
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.mini-tank canvas {
+  display: block;
+}
+
+.chips {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 14px 0 2px;
+  scrollbar-width: none;
+}
+
+.chip {
+  flex: none;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--fill);
+  color: var(--ink);
+  font: 600 15px/1 var(--ui-font);
+  cursor: pointer;
+}
+
+.chip[aria-pressed='true'] {
+  border-color: transparent;
+  background: var(--ink);
+  color: #06243d;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+  color: var(--ink-soft);
+  font-size: 14px;
+}
+
+/* 16px or more, so iOS doesn't zoom in when the field gets focus. */
+.text-input {
+  min-height: 50px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--fill);
+  color: var(--ink);
+  font: 500 17px var(--ui-font);
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.text-input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.swatch {
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.swatch.natural {
+  background: conic-gradient(#ff8a24, #3aa8d4, #f3d36b, #8697a6, #ff8a24);
+}
+
+.swatch[aria-pressed='true'] {
+  border-color: var(--ink);
+  box-shadow: 0 0 0 3px var(--accent);
+}

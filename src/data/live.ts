@@ -6,7 +6,7 @@ export interface LiveHandlers {
   /** A fish was added, changed or removed (removals arrive with `deletedAt` set). */
   fish(record: FishRecord): void
   /** Who's in the tank right now, as user ids. */
-  presence(online: Set<string>): void
+  presence?(online: Set<string>): void
   /** The connection came back after dropping, so some changes may have been missed. */
   reconnected(): void
   /** Someone tapped a fish. */
@@ -46,7 +46,7 @@ export async function connectTank(tankId: string, userId: string, handlers: Live
     const row = payload.new as Record<string, unknown> | undefined
     if (row && 'id' in row) handlers.message(messageFromRow(row))
   })
-  channel.on('presence', { event: 'sync' }, () => handlers.presence(new Set(Object.keys(channel.presenceState()))))
+  channel.on('presence', { event: 'sync' }, () => handlers.presence?.(new Set(Object.keys(channel.presenceState()))))
 
   // Broadcasts come from other members' phones: check their shape before using them.
   channel.on('broadcast', { event: 'poke' }, ({ payload }) => {

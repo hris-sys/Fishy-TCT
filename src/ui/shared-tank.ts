@@ -97,7 +97,7 @@ export async function startShared(tank: Tank, invite: string | null, handlers: T
 }
 
 /**
- * Loads everyone's fish into the tank, keeps it live (new, changed and removed fish; who's online),
+ * Loads everyone's fish into the tank, keeps it live (new, changed and removed fish),
  * and wires up adding, editing and removing.
  */
 async function openTank(tank: Tank, info: MyTank, userId: string, handlers: TankHandlers, options: SharedOptions, addRightAway: boolean) {
@@ -108,12 +108,9 @@ async function openTank(tank: Tank, info: MyTank, userId: string, handlers: Tank
   }
   const records = new Map<string, FishRecord>()
   const faces = new Map<string, Faces>()
-  /** Who's online, by user id. Null until the first presence update: until then, nobody sleeps. */
-  let online: Set<string> | null = null
   /** True while our own new fish is being saved, so its live "insert" doesn't add it twice. */
   let savingNew = false
 
-  const isOnline = (ownerId: string) => ownerId === userId || online === null || online.has(ownerId)
   const toResident = (record: FishRecord, photos: Faces): ResidentInput => ({
     id: record.id,
     name: record.name,
@@ -180,7 +177,6 @@ async function openTank(tank: Tank, info: MyTank, userId: string, handlers: Tank
       records.set(record.id, record)
       faces.set(record.id, photos)
       tank.addResident(toResident(record, photos), { dropIn: true })
-      tank.setAsleep(record.id, !isOnline(record.ownerId))
       // Your own fish, made on another device.
       if (record.ownerId === userId) {
         mine = record
@@ -193,7 +189,6 @@ async function openTank(tank: Tank, info: MyTank, userId: string, handlers: Tank
     records.set(record.id, record)
     // A fish can change owner when someone moves to another device.
     if (record.ownerId !== known.ownerId) {
-      tank.setAsleep(record.id, !isOnline(record.ownerId))
       if (mine?.id === record.id && record.ownerId !== userId) {
         mine = null
         refreshButton()
@@ -227,10 +222,6 @@ async function openTank(tank: Tank, info: MyTank, userId: string, handlers: Tank
     queue = queue.then(task).catch((error) => console.warn('A live update failed', error))
   }
 
-  const updateSleep = () => {
-    for (const record of records.values()) tank.setAsleep(record.id, !isOnline(record.ownerId))
-  }
-
   // Chat: messages go in the chat window (not on a TV) and pop up above the author's fish.
   let chat: ReturnType<typeof createChat> | null = null
   const fishOf = (authorId: string) => [...records.values()].find((record) => record.ownerId === authorId && !record.deletedAt)
@@ -243,11 +234,9 @@ async function openTank(tank: Tank, info: MyTank, userId: string, handlers: Tank
   let live: LiveTank | null = null
   try {
     live = await connectTank(info.id, userId, {
+      // Fish stay awake whether or not their owner has the app open (a dozing tank looked sad);
+      // the channel still tracks who's online, should that ever be useful.
       fish: (record) => enqueue(() => apply(record)),
-      presence: (ids) => {
-        online = ids
-        updateSleep()
-      },
       reconnected: () => enqueue(refetch),
       // Someone else poked a fish: it reacts here too, with a note saying who did it.
       poke: ({ fishId, by }) => {

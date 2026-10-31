@@ -200,7 +200,7 @@ _Taps on the top 22% of the tank feed; the same random seed goes out with each d
 
 **Done when:** a poke or a feed on one phone shows up on the others in under a second.
 
-_Headless end-to-end with two browsers against the real project: a poke reached the other screen in ~80 ms (the fish reacted there too, switching to its blub face) and a feed in ~55 ms. Still to confirm on real phones._
+_Headless end-to-end with two browsers against the real project: a poke reached the other screen in ~80 ms (the fish reacted there too, switching to its blub face) and a feed in ~55 ms. Passed on two real devices and merged (Oct 31, 2026)._
 
 ## Iteration 6 · Polish and keep-alive (1–2 evenings)
 

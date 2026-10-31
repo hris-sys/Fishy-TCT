@@ -152,7 +152,7 @@ _UI screens are plain TypeScript (`src/ui/`), no framework. Photos are scaled to
 
 **Done when:** a phone photo becomes a fish in under 30 s, and portrait, landscape and iPhone photos all come out upright and sit correctly in all five masks.
 
-_Headless check: portrait, landscape and a sideways-stored photo with EXIF orientation 6 all export upright as 256 px WebP; drag, wheel, slider and two-finger pinch zoom verified with real input events. Still to confirm on a real phone: the 30-second run and the front camera._
+_Headless check: portrait, landscape and a sideways-stored photo with EXIF orientation 6 all export upright as 256 px WebP; drag, wheel, slider and two-finger pinch zoom verified with real input events. Passed on a real phone (Oct 31, 2026); merged to main._
 
 ## Iteration 3 · Private, persistent, shared: the MVP (2–3 evenings)
 

@@ -13,6 +13,9 @@ const BOB_HZ = 0.3
 const DEEP_TINT = [150, 182, 210]
 const DEEP_TINT_STRENGTH = 0.55
 
+/** Overshoots a little before settling, like something springy. */
+const easeOutBack = (t: number) => 1 + 2.7 * (t - 1) ** 3 + 1.7 * (t - 1) ** 2
+
 /** Who a fish belongs to. Shared by all of one person's fish, so an edit reaches the whole school. */
 export interface Owner {
   id: string
@@ -65,11 +68,24 @@ export class Fish {
   entering: { delay: number; inWater: number; splashed: boolean } | null = null
   /** Set when the fish has been removed and is swimming off-screen toward this side. */
   leaving: { direction: 1 | -1 } | null = null
+  /** The tap reaction playing right now (its species' `reaction`), and how long it has run. */
+  reaction: { kind: string; t: number } | null = null
+  /** 0 normally, 1 when tucked into the anemone (clownfish). */
+  hiding = 0
+  /** Seconds left showing the blub ("O" mouth) face, if there is one. */
+  blub = 0
+  /** Seconds left of a chomp, after eating a flake. */
+  chomp = 0
 
   private readonly flip = new Container()
   private readonly tail: Sprite
   private readonly body: Sprite
   private readonly face: Sprite
+  /** Optional light on the body, e.g. the anglerfish's lure. */
+  private readonly glow: Sprite | null
+  private faceTexture: Texture
+  private blubTexture: Texture | null
+  private glowPhase = Math.random() * Math.PI * 2
 
   /** 0 when facing right, π when facing left; scale.x is its cosine, so a turn squashes through 0. */
   private turn = 0
@@ -79,15 +95,26 @@ export class Fish {
   private tailPhase = Math.random() * Math.PI * 2
   private bobPhase = Math.random() * Math.PI * 2
 
-  constructor(species: LoadedSpecies, face: Texture, owner: Owner) {
+  constructor(species: LoadedSpecies, face: Texture, blub: Texture | null, owner: Owner, glowTexture: Texture) {
     this.species = species
     this.owner = owner
+    this.faceTexture = face
+    this.blubTexture = blub
     this.tail = new Sprite(species.tail)
     this.body = new Sprite(species.body)
     this.body.anchor.set(0.5)
     this.face = new Sprite(face)
     this.face.anchor.set(0.5)
     this.flip.addChild(this.tail, this.body)
+    const glow = species.config.glow
+    this.glow = glow ? new Sprite(glowTexture) : null
+    if (this.glow && glow) {
+      this.glow.anchor.set(0.5)
+      this.glow.blendMode = 'add'
+      this.glow.tint = '#fff1a0'
+      this.glow.position.set(glow.x, glow.y)
+      this.flip.addChild(this.glow)
+    }
     this.view.addChild(this.flip, this.face)
   }
 
@@ -95,8 +122,14 @@ export class Fish {
     return this.species.config
   }
 
-  setFace(texture: Texture) {
-    this.face.texture = texture
+  setFace(face: Texture, blub: Texture | null) {
+    this.faceTexture = face
+    this.blubTexture = blub
+  }
+
+  /** 1 when facing right, -1 when facing left. */
+  get facingSign() {
+    return this.facing
   }
 
   /** Art units from the center to the nose, and to the tail tip. */
@@ -166,7 +199,37 @@ export class Fish {
     const speed = Math.hypot(this.vx, this.vy)
     const flipX = this.flipX
     const side = flipX >= 0 ? 1 : -1
-    this.flip.scale.x = flipX
+
+    // Tap reactions that change the shape: puff up, snap, flash the lure.
+    let grow = 1
+    let stretch = 1
+    let flash = 0
+    if (this.reaction) {
+      const t = (this.reaction.t += dt)
+      const kind = this.reaction.kind
+      if (kind === 'puff') {
+        grow = 1 + (t < 0.3 ? easeOutBack(t / 0.3) : t < 1.7 ? 1 + Math.sin(t * 9) * 0.03 : Math.max(0, 1 - (t - 1.7) / 0.6))
+      } else if (kind === 'snap') {
+        stretch = 1 + 0.2 * Math.sin(t * Math.PI * 7) * Math.max(0, 1 - t / 0.6)
+      } else if (kind === 'lure-flash') {
+        flash = Math.max(0, 1 - t / 1.4)
+      }
+      const length = kind === 'puff' ? 2.3 : kind === 'hide-in-anemone' ? 4.5 : kind === 'lure-flash' ? 1.6 : 1.2
+      if (t > length) this.reaction = null
+    }
+    if (this.chomp > 0) {
+      this.chomp = Math.max(0, this.chomp - dt)
+      grow *= 1 + 0.14 * Math.sin((1 - this.chomp / 0.3) * Math.PI)
+    }
+    this.blub = Math.max(0, this.blub - dt)
+    this.face.texture = this.blub > 0 && this.blubTexture ? this.blubTexture : this.faceTexture
+    this.flip.scale.x = flipX * stretch
+    if (this.glow && this.config.glow) {
+      this.glowPhase += dt * 1.7
+      const size = this.config.glow.size / 64
+      this.glow.alpha = Math.min(1, 0.45 + 0.15 * Math.sin(this.glowPhase) + flash)
+      this.glow.scale.set(size * (1 + flash * 2.5))
+    }
 
     // Nose follows the climb or dive.
     const targetPitch = clamp(Math.atan2(this.vy, Math.abs(this.vx)), -MAX_PITCH, MAX_PITCH) * side
@@ -207,7 +270,8 @@ export class Fish {
     this.view.visible = !this.entering || this.entering.delay <= 0
 
     this.bobPhase += dt * Math.PI * 2 * BOB_HZ
-    this.view.scale.set(this.config.scale * world.scale)
+    this.view.scale.set(this.config.scale * world.scale * grow)
+    this.view.alpha = 1 - 0.7 * this.hiding
     this.view.rotation = this.pitch
     this.view.position.set(this.x, this.y + Math.sin(this.bobPhase) * swim.bob * world.scale)
   }

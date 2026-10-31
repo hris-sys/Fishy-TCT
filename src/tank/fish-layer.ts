@@ -1,11 +1,12 @@
-import { Container, type Texture } from 'pixi.js'
+import { Container, Texture } from 'pixi.js'
 import type { Effects } from './effects'
+import type { Food } from './food'
 import { bakeMaskedFace, drawPlaceholderFace } from './face'
 import { Fish, type Owner, type School } from './fish'
 import type { SceneLayer, TankWorld } from './layer'
 import type { LoadedSpecies } from './species'
 import { depthBand, steer } from './steering'
-import { canvasTexture, randomBetween } from './util'
+import { canvasTexture, makeCanvas, randomBetween } from './util'
 
 /** Longest simulation step, in seconds. */
 const MAX_STEP = 1 / 50
@@ -15,6 +16,11 @@ const GRAVITY = 900
 const DROP_STAGGER = 0.08
 /** Seconds for a fish to drift off to sleep, or wake up. */
 const SLEEP_EASE = 1.2
+/** Seconds a fish shows its blub face after being poked. */
+const POKE_BLUB = 0.9
+
+/** Sounds the tank asks the app to play. */
+export type TankSound = 'splash' | 'eat' | 'feed' | 'react'
 
 const PLACEHOLDER_NAMES = ['Mira', 'Teo', 'Lina', 'Bo', 'Ari', 'Niko', 'Zoe', 'Ivo', 'Sana', 'Max', 'Ema', 'Dani', 'Rui', 'Kai', 'Lea', 'Tom', 'Vera', 'Omar', 'Yuki', 'Pia']
 
@@ -28,6 +34,8 @@ export interface ResidentInput {
   tint?: number | null
   /** The unmasked square face crop. Each species cuts it to its own mask. */
   face: CanvasImageSource
+  /** Optional second photo with an "O" mouth, shown while eating or when poked. */
+  blub?: CanvasImageSource | null
 }
 
 /** One person in the tank: their face, and the fish wearing it (one, or a whole school). */
@@ -36,6 +44,8 @@ interface Resident {
   species: LoadedSpecies
   faceSource: CanvasImageSource
   face: Texture
+  blubSource: CanvasImageSource | null
+  blub: Texture | null
   fish: Fish[]
   placeholder: boolean
   /** Removed, and swimming off-screen; gone for good once every fish has left. */
@@ -63,10 +73,18 @@ export interface FishLayer extends SceneLayer {
   /** The fish nearest to a screen point, if the point is on or close to it. */
   fishAt(x: number, y: number): Fish | null
   firstFishOf(id: string): Fish | null
+  /** Plays the tap reaction of someone's fish (the whole school, for a school). */
+  react(id: string): void
 }
 
 /** Everybody's fish: steering, schools, and dropping new fish in. */
-export function createFishLayer(species: LoadedSpecies[], effects: Effects): FishLayer {
+export function createFishLayer(
+  species: LoadedSpecies[],
+  effects: Effects,
+  food: Food,
+  sound: (name: TankSound, detail?: string) => void,
+): FishLayer {
+  const glowTexture = Texture.from(drawGlow())
   const view = new Container()
   view.sortableChildren = true
   const residents: Resident[] = []
@@ -109,7 +127,7 @@ export function createFishLayer(species: LoadedSpecies[], effects: Effects): Fis
   function populate(resident: Resident) {
     const kind = resident.species
     const size = Math.max(1, Math.round(kind.config.swim.school ?? 1))
-    resident.fish = Array.from({ length: size }, () => new Fish(kind, resident.face, resident.owner))
+    resident.fish = Array.from({ length: size }, () => new Fish(kind, resident.face, resident.blub, resident.owner, glowTexture))
     if (size > 1) {
       const school: School = { members: resident.fish, depth: Math.random(), depthTimer: randomBetween(6, 14) }
       schools.push(school)
@@ -140,6 +158,8 @@ export function createFishLayer(species: LoadedSpecies[], effects: Effects): Fis
       species: kind,
       faceSource: input.face,
       face: bake(kind, input.face),
+      blubSource: input.blub ?? null,
+      blub: input.blub ? bake(kind, input.blub) : null,
       fish: [],
       placeholder,
       leaving: false,
@@ -153,6 +173,7 @@ export function createFishLayer(species: LoadedSpecies[], effects: Effects): Fis
   function removeResident(resident: Resident) {
     unpopulate(resident)
     resident.face.destroy(true)
+    resident.blub?.destroy(true)
     residents.splice(residents.indexOf(resident), 1)
   }
 
@@ -178,6 +199,26 @@ export function createFishLayer(species: LoadedSpecies[], effects: Effects): Fis
     }
   }
 
+  /** Fish that reach a flake eat it: a chomp, the blub face, and a couple of bubbles. */
+  function eat(at: TankWorld) {
+    if (food.flakes.length === 0) return
+    const s = at.scale
+    for (const fish of allFish) {
+      if (fish.entering || fish.leaving || fish.owner.awake < 0.5) continue
+      const reach = fish.radius(s) * 0.9 + 4 * s
+      for (const flake of food.flakes) {
+        if (flake.eaten) continue
+        if (Math.hypot(flake.x - fish.x, flake.y - fish.y) > reach) continue
+        food.eat(flake)
+        fish.chomp = 0.3
+        fish.blub = Math.max(fish.blub, 0.6)
+        effects.bubbles(flake.x, flake.y, 2, 6 * s)
+        sound('eat')
+        break
+      }
+    }
+  }
+
   /** The fall: through the air, a splash at the surface, then quickly slowed by the water. */
   function fall(fish: Fish, at: TankWorld, dt: number) {
     const entering = fish.entering!
@@ -192,6 +233,7 @@ export function createFishLayer(species: LoadedSpecies[], effects: Effects): Fis
       if (!entering.splashed) {
         entering.splashed = true
         effects.splash(fish.x, fish.radius(s))
+        sound('splash')
       }
       entering.inWater += dt
       const drag = Math.exp(-dt * 3)
@@ -236,15 +278,18 @@ export function createFishLayer(species: LoadedSpecies[], effects: Effects): Fis
       if (!resident) return
       if (changes.name !== undefined) resident.owner.name = changes.name
       if (changes.tint !== undefined) resident.owner.tint = changes.tint
-      if (changes.species === undefined && changes.face === undefined) return
-      // New species or face: rebuild the fish, keeping them roughly where they were.
+      if (changes.species === undefined && changes.face === undefined && changes.blub === undefined) return
+      // New species or faces: rebuild the fish, keeping them roughly where they were.
       const anchor = resident.fish[0]
       const spot = anchor ? { x: anchor.x, y: anchor.y, vx: anchor.vx } : null
       unpopulate(resident)
       resident.face.destroy(true)
+      resident.blub?.destroy(true)
       if (changes.species !== undefined) resident.species = findSpecies(changes.species)
       if (changes.face !== undefined) resident.faceSource = changes.face
+      if (changes.blub !== undefined) resident.blubSource = changes.blub
       resident.face = bake(resident.species, resident.faceSource)
+      resident.blub = resident.blubSource ? bake(resident.species, resident.blubSource) : null
       populate(resident)
       if (world) place(resident, world, false)
       if (spot) {
@@ -269,10 +314,11 @@ export function createFishLayer(species: LoadedSpecies[], effects: Effects): Fis
     refreshSpecies(id) {
       for (const resident of residents) {
         if (resident.species.config.id !== id) continue
-        const old = resident.face
+        const old = [resident.face, resident.blub]
         resident.face = bake(resident.species, resident.faceSource)
-        for (const fish of resident.fish) fish.setFace(resident.face)
-        old.destroy(true)
+        resident.blub = resident.blubSource ? bake(resident.species, resident.blubSource) : null
+        for (const fish of resident.fish) fish.setFace(resident.face, resident.blub)
+        for (const texture of old) texture?.destroy(true)
       }
     },
     fishAt(x, y) {
@@ -293,6 +339,46 @@ export function createFishLayer(species: LoadedSpecies[], effects: Effects): Fis
     },
     firstFishOf(id) {
       return residents.find((r) => r.owner.id === id && !r.leaving)?.fish[0] ?? null
+    },
+    react(id) {
+      const resident = residents.find((r) => r.owner.id === id && !r.leaving)
+      if (!resident || !world) return
+      const s = world.scale
+      const kind = resident.species.config.reaction
+      const fish = resident.fish.filter((member) => !member.entering)
+      if (fish.length === 0) return
+      const centerX = fish.reduce((sum, member) => sum + member.x, 0) / fish.length
+      const centerY = fish.reduce((sum, member) => sum + member.y, 0) / fish.length
+      for (const member of fish) {
+        member.reaction = { kind, t: 0 }
+        member.blub = POKE_BLUB
+        const cruise = member.config.swim.speed * s
+        if (kind === 'scatter') {
+          // Burst outward from the middle of the school; cohesion pulls them back together.
+          let dx = member.x - centerX
+          let dy = member.y - centerY
+          const distance = Math.hypot(dx, dy)
+          if (distance < 1) {
+            const angle = Math.random() * Math.PI * 2
+            dx = Math.cos(angle)
+            dy = Math.sin(angle)
+          } else {
+            dx /= distance
+            dy /= distance
+          }
+          member.vx += dx * cruise * 3.5
+          member.vy += dy * cruise * 2.5
+          member.boost = Math.max(member.boost, 1.4)
+        } else if (kind === 'snap') {
+          // Lunge forward with a snap of the jaws.
+          member.vx = member.facingSign * cruise * 4
+          member.boost = Math.max(member.boost, 1.8)
+          effects.bubbles(member.x + member.facingSign * member.halfWidth(s), member.y, 4, member.radius(s))
+        } else if (kind === 'puff') {
+          effects.bubbles(member.x, member.y, 5, member.radius(s) * 1.5)
+        }
+      }
+      sound('react', kind)
     },
     resize(next) {
       if (world) {
@@ -326,8 +412,9 @@ export function createFishLayer(species: LoadedSpecies[], effects: Effects): Fis
           fish.updateTurn(step, world.scale)
           if (fish.leaving) swimAway(fish, world, step)
           else if (fish.entering) fall(fish, world, step)
-          else steer(fish, allFish, world, step)
+          else steer(fish, allFish, world, step, food.flakes)
         }
+        eat(world)
       }
       for (const resident of [...residents]) {
         // Removed fish are deleted once every one of them has left the screen.
@@ -356,4 +443,16 @@ export function createFishLayer(species: LoadedSpecies[], effects: Effects): Fis
       for (const fish of allFish) fish.animate(dt, world)
     },
   }
+}
+
+/** A soft round light, for glowing parts like the anglerfish's lure. */
+function drawGlow() {
+  const { canvas, ctx } = makeCanvas(64)
+  const light = ctx.createRadialGradient(32, 32, 0, 32, 32, 32)
+  light.addColorStop(0, 'rgba(255, 255, 255, 1)')
+  light.addColorStop(0.25, 'rgba(255, 255, 255, 0.55)')
+  light.addColorStop(1, 'rgba(255, 255, 255, 0)')
+  ctx.fillStyle = light
+  ctx.fillRect(0, 0, 64, 64)
+  return canvas
 }

@@ -1,4 +1,5 @@
 import type { Fish } from './fish'
+import type { Flake } from './food'
 import type { TankWorld } from './layer'
 import { clamp, lerp, randomBetween } from './util'
 
@@ -26,6 +27,11 @@ const SCHOOL_SPREAD = 2.2
 const SCHOOL_COHESION = 1.4
 /** School members swim closer together than strangers do. */
 const SCHOOLMATE_SPACE = 0.6
+/** Fish notice food this far away, in px at tank scale 1. */
+const FOOD_RANGE = 380
+/** Seconds a tapped clownfish spends dashing to the anemone and tucked into it. */
+const HIDE_SECONDS = 3.4
+
 /** Schools: spring toward the school's current target depth, per second², capped at the cruise speed. */
 const SCHOOL_DEPTH_PULL = 0.8
 
@@ -52,13 +58,22 @@ export function depthBand(fish: Fish, world: TankWorld) {
  * current heading), stay in the depth band, keep off the walls, keep a little space from
  * neighbours, flee predators, stick with the school, and for some species head home.
  */
-export function steer(fish: Fish, everyone: readonly Fish[], world: TankWorld, dt: number) {
+export function steer(fish: Fish, everyone: readonly Fish[], world: TankWorld, dt: number, flakes: readonly Flake[]) {
   const { swim } = fish.config
   const s = world.scale
 
-  // Asleep fish drift slowly and hardly meander.
+  // A tapped clownfish dashes into its anemone and stays tucked in for a moment.
+  const reaction = fish.reaction
+  if (reaction?.kind === 'hide-in-anemone' && reaction.t < HIDE_SECONDS) {
+    hideInAnemone(fish, world, dt)
+    return
+  }
+  fish.hiding = Math.max(0, fish.hiding - dt * 1.5)
+
+  // Asleep fish drift slowly and hardly meander; a puffed-up pufferfish barely moves.
   const awake = fish.owner.awake
-  const energy = 0.3 + 0.7 * awake
+  const puffed = reaction?.kind === 'puff' && reaction.t < 2
+  const energy = (0.3 + 0.7 * awake) * (puffed ? 0.3 : 1)
 
   // Darting: a sudden burst of speed every few seconds that fades out quickly.
   if (swim.dart > 0 && awake > 0.8) {
@@ -138,9 +153,31 @@ export function steer(fish: Fish, everyone: readonly Fish[], world: TankWorld, d
     }
   }
 
-  // Depth band: a soft spring back toward the preferred depth. A scared fish ignores it until the
-  // danger has passed, so it can flee downward as freely as upward.
-  const calm = 1 - Math.min(1, fear * 2)
+  // Food: race for the nearest flake within reach.
+  let hungry = false
+  if (awake > 0.5 && !puffed && flakes.length > 0) {
+    let target: Flake | null = null
+    let nearest = FOOD_RANGE * s
+    for (const flake of flakes) {
+      if (flake.eaten || flake.y < 0) continue
+      const distance = Math.hypot(flake.x - fish.x, flake.y - fish.y)
+      if (distance < nearest) {
+        target = flake
+        nearest = distance
+      }
+    }
+    if (target) {
+      hungry = true
+      fish.boost = Math.max(fish.boost, 0.8)
+      const distance = nearest || 0.001
+      ax += (((target.x - fish.x) / distance) * cruise * 1.6 - fish.vx) * swim.turnRate * 2.5
+      ay += (((target.y - fish.y) / distance) * cruise * 1.6 - fish.vy) * swim.turnRate * 2.5
+    }
+  }
+
+  // Depth band: a soft spring back toward the preferred depth. A scared or hungry fish ignores it
+  // for the moment, so it can flee or chase food downward as freely as upward.
+  const calm = (1 - Math.min(1, fear * 2)) * (hungry ? 0.15 : 1)
   if (fish.y < band.top) ay += (band.top - fish.y) * BAND_PULL * calm
   else if (fish.y > band.bottom) ay -= (fish.y - band.bottom) * BAND_PULL * calm
 
@@ -223,4 +260,22 @@ export function steer(fish: Fish, everyone: readonly Fish[], world: TankWorld, d
     fish.y = band.column.bottom
     fish.vy = Math.min(0, fish.vy)
   }
+}
+
+/** Swims to just above the anemone and fades in among the tentacles. */
+function hideInAnemone(fish: Fish, world: TankWorld, dt: number) {
+  const s = world.scale
+  const targetX = world.anemone.x
+  const targetY = Math.min(world.anemone.y - 16 * s, waterColumn(fish, world).bottom)
+  const dx = targetX - fish.x
+  const dy = targetY - fish.y
+  const distance = Math.hypot(dx, dy) || 0.001
+  const speed = fish.config.swim.speed * s * 2.6 * Math.min(1, distance / (50 * s))
+  const ease = Math.min(1, dt * 5)
+  fish.vx += ((dx / distance) * speed - fish.vx) * ease
+  fish.vy += ((dy / distance) * speed - fish.vy) * ease
+  fish.x += fish.vx * dt
+  fish.y += fish.vy * dt
+  const tucked = distance < 28 * s
+  fish.hiding = tucked ? Math.min(1, fish.hiding + dt * 3) : Math.max(0, fish.hiding - dt * 3)
 }

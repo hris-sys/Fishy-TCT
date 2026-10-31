@@ -475,3 +475,82 @@
   color: rgba(242, 250, 254, 0.45);
   overflow-wrap: anywhere;
 }
+
+/* Sound on/off, top left. */
+.mute-button {
+  position: fixed;
+  top: calc(env(safe-area-inset-top) + 10px);
+  left: calc(env(safe-area-inset-left) + 10px);
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: rgba(4, 26, 46, 0.55);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.mute-button .icon {
+  width: 20px;
+  height: 20px;
+}
+
+/* "Ana poked Mira" and other short messages. */
+.toasts {
+  position: fixed;
+  top: calc(env(safe-area-inset-top) + 12px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: max-content;
+  max-width: calc(100vw - 120px);
+  pointer-events: none;
+}
+
+.toast {
+  padding: 9px 16px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(4, 26, 46, 0.88);
+  color: var(--ink);
+  font: 600 15px/1.25 var(--ui-font);
+  text-align: center;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.3);
+  animation: toast-in 0.2s ease-out;
+  transition: opacity 0.35s, transform 0.35s;
+}
+
+.toast.leaving {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+}
+
+/* Blub face: a small preview with change/remove buttons. */
+.blub-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.blub-thumb {
+  width: 44px;
+  height: 44px;
+  border: 2px solid rgba(255, 255, 255, 0.6);
+  border-radius: 50%;
+}

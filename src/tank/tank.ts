@@ -5,7 +5,8 @@ import { createBackdrop } from './backdrop'
 import { createBubbles } from './bubbles'
 import { createCaustics } from './caustics'
 import { createEffects } from './effects'
-import { type ResidentInput, createFishLayer } from './fish-layer'
+import { type ResidentInput, type TankSound, createFishLayer } from './fish-layer'
+import { createFood } from './food'
 import type { SceneLayer, TankWorld } from './layer'
 import { createPlants } from './plants'
 import { createRays } from './rays'
@@ -20,6 +21,9 @@ import { createWater } from './water'
 const MAX_RESOLUTION = 2
 /** The short screen side, in CSS px, that counts as tank scale 1. */
 const REFERENCE_SIZE = 480
+/** Holding a finger down this long, without moving, is a long press instead of a tap. */
+const LONG_PRESS_MS = 550
+const TAP_SLOP = 12
 
 export interface TankOptions {
   species: SpeciesConfig[]
@@ -33,6 +37,12 @@ export interface TankOptions {
   interactive?: boolean
   /** Called with the owner's id when a fish is tapped. */
   onFishTap?: (id: string) => void
+  /** Called with the owner's id when a fish is held down. */
+  onFishLongPress?: (id: string) => void
+  /** Called when open water is tapped, with the spot as fractions of the tank's width and height. */
+  onWaterTap?: (x: number, y: number) => void
+  /** The tank wants a sound played; the app decides whether and how. */
+  onSound?: (name: TankSound, detail?: string) => void
   /** Exposes the Pixi app as `__PIXI_APP__` for the PixiJS devtools extension and test scripts. */
   devtools?: boolean
 }
@@ -62,6 +72,10 @@ export interface Tank {
   setPlaceholders(count: number): void
   /** Shows someone's name tag, as if their fish was tapped. */
   showTag(id: string): void
+  /** Plays the tap reaction of someone's fish (the whole school, for a school). */
+  react(id: string): void
+  /** Drops food at a fraction of the width. The same seed scatters it the same way on every screen. */
+  feed(xFraction: number, seed: number): void
   /** Stops animating (e.g. while a full-screen dialog covers the tank). */
   setPaused(paused: boolean): void
   /** Call after changing a species' mask, so its faces are re-cut. Other config changes apply live. */
@@ -101,12 +115,14 @@ export async function createTank(host: HTMLElement, options: TankOptions): Promi
 
   const species = await loadSpecies(options.species)
   const effects = createEffects()
-  const fish = createFishLayer(species, effects)
+  const food = createFood()
+  const sound = (name: TankSound, detail?: string) => options.onSound?.(name, detail)
+  const fish = createFishLayer(species, effects, food, sound)
   const tags = createNameTags()
   // Back to front. Rocks and corals come before the sand so their bases sink into it.
   const layers: SceneLayer[] =
     options.scenery === 'simple'
-      ? [createWater(), createSand(), createCaustics(), createAnemone(), fish, effects, createBubbles(), tags]
+      ? [createWater(), createSand(), createCaustics(), createAnemone(), fish, food, effects, createBubbles(), tags]
       : [
           createWater(),
           createBackdrop(),
@@ -117,6 +133,7 @@ export async function createTank(host: HTMLElement, options: TankOptions): Promi
           createCaustics(),
           createAnemone(),
           fish,
+          food,
           effects,
           createPlants('front'),
           createParticles(),
@@ -143,15 +160,44 @@ export async function createTank(host: HTMLElement, options: TankOptions): Promi
   const observer = new ResizeObserver(resize)
   observer.observe(host)
 
-  // Tapping a fish shows its owner's name. The tap may land a little off a small fish.
+  // Tap a fish: its name tag shows and the app hears about it. Hold a fish: a long press, fired
+  // while still holding. Tap open water: the app hears where. The fish is picked when the finger
+  // goes down, so a fish swimming away mid-press still counts, and taps may land a little off.
   if (options.interactive !== false) {
     app.stage.eventMode = 'static'
     app.stage.hitArea = app.screen
-    app.stage.on('pointertap', (event) => {
-      const tapped = fish.fishAt(event.global.x, event.global.y)
-      if (!tapped) return
-      tags.show(tapped)
-      options.onFishTap?.(tapped.owner.id)
+    let press: { x: number; y: number; target: ReturnType<typeof fish.fishAt>; timer: number; done: boolean } | null = null
+    const cancel = () => {
+      if (press) window.clearTimeout(press.timer)
+      press = null
+    }
+    app.stage.on('pointerdown', (event) => {
+      cancel()
+      const { x, y } = event.global
+      const target = fish.fishAt(x, y)
+      const current = { x, y, target, timer: 0, done: false }
+      if (target) {
+        current.timer = window.setTimeout(() => {
+          current.done = true
+          options.onFishLongPress?.(target.owner.id)
+        }, LONG_PRESS_MS)
+      }
+      press = current
+    })
+    app.stage.on('pointermove', (event) => {
+      if (press && Math.hypot(event.global.x - press.x, event.global.y - press.y) > TAP_SLOP) cancel()
+    })
+    app.stage.on('pointerupoutside', cancel)
+    app.stage.on('pointerup', (event) => {
+      const current = press
+      cancel()
+      if (!current || current.done) return
+      if (current.target) {
+        tags.show(current.target)
+        options.onFishTap?.(current.target.owner.id)
+      } else {
+        options.onWaterTap?.(event.global.x / app.screen.width, event.global.y / app.screen.height)
+      }
     })
   }
 
@@ -189,6 +235,11 @@ export async function createTank(host: HTMLElement, options: TankOptions): Promi
     showTag(id) {
       const first = fish.firstFishOf(id)
       if (first) tags.show(first)
+    },
+    react: (id) => fish.react(id),
+    feed(xFraction, seed) {
+      food.drop(xFraction, seed)
+      sound('feed')
     },
     setPaused(next) {
       paused = next

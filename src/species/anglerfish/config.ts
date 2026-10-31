@@ -26,5 +26,7 @@ export const anglerfish: SpeciesConfig = {
     dart: 0,
     predator: false,
   },
+  // The lure's bulb, so it can glow and flash.
+  glow: { x: 60, y: -43, size: 40 },
   reaction: 'lure-flash',
 }

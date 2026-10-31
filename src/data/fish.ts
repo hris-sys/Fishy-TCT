@@ -24,6 +24,8 @@ export interface FishChanges {
   tint: number | null
   /** A new face photo, or null to keep the current one. */
   face: Blob | null
+  /** A new blub ("O" mouth) photo; null removes it; left out keeps the current one. */
+  blub?: Blob | null
 }
 
 export function fromRow(row: Record<string, unknown>): FishRecord {
@@ -92,14 +94,24 @@ async function deleteFaces(paths: (string | null)[]) {
 /** Uploads the face, then adds the fish. */
 export async function createFish(tankId: string, ownerId: string, fish: FishChanges & { face: Blob }): Promise<FishRecord> {
   const facePath = newFacePath(tankId, ownerId, fish.face)
+  const blubPath = fish.blub ? newFacePath(tankId, ownerId, fish.blub) : null
   await uploadFace(facePath, fish.face)
+  if (blubPath && fish.blub) await uploadFace(blubPath, fish.blub)
   const { data, error } = await db()
     .from('fish')
-    .insert({ tank_id: tankId, owner_id: ownerId, name: fish.name, species: fish.species, tint: fish.tint, face_path: facePath })
+    .insert({
+      tank_id: tankId,
+      owner_id: ownerId,
+      name: fish.name,
+      species: fish.species,
+      tint: fish.tint,
+      face_path: facePath,
+      face_blub_path: blubPath,
+    })
     .select(COLUMNS)
     .single()
   if (error) {
-    await deleteFaces([facePath])
+    await deleteFaces([facePath, blubPath])
     throw error
   }
   return fromRow(data)
@@ -108,18 +120,27 @@ export async function createFish(tankId: string, ownerId: string, fish: FishChan
 /** Saves changes to your fish. A new face is uploaded first; the old file is deleted afterwards. */
 export async function updateFish(fish: FishRecord, changes: FishChanges): Promise<FishRecord> {
   const facePath = changes.face ? newFacePath(fish.tankId, fish.ownerId, changes.face) : null
+  const blubPath = changes.blub ? newFacePath(fish.tankId, fish.ownerId, changes.blub) : null
   if (facePath && changes.face) await uploadFace(facePath, changes.face)
+  if (blubPath && changes.blub) await uploadFace(blubPath, changes.blub)
+  const blubChanged = changes.blub !== undefined
   const { data, error } = await db()
     .from('fish')
-    .update({ name: changes.name, species: changes.species, tint: changes.tint, ...(facePath ? { face_path: facePath } : {}) })
+    .update({
+      name: changes.name,
+      species: changes.species,
+      tint: changes.tint,
+      ...(facePath ? { face_path: facePath } : {}),
+      ...(blubChanged ? { face_blub_path: blubPath } : {}),
+    })
     .eq('id', fish.id)
     .select(COLUMNS)
     .single()
   if (error) {
-    if (facePath) await deleteFaces([facePath])
+    await deleteFaces([facePath, blubPath])
     throw error
   }
-  if (facePath) await deleteFaces([fish.facePath])
+  await deleteFaces([facePath ? fish.facePath : null, blubChanged ? fish.faceBlubPath : null])
   return fromRow(data)
 }
 

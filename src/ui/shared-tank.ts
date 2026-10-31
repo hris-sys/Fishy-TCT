@@ -1,5 +1,5 @@
 import { type FishRecord, createFish, describeError, errorDetail, listFish, loadFace, removeFish, signFaceUrls, updateFish } from '../data/fish'
-import { connectTank } from '../data/live'
+import { type LiveTank, connectTank } from '../data/live'
 import { currentUserId, ensureSignedIn } from '../data/session'
 import { type MyTank, inviteTankName, joinTank, myTanks } from '../data/tanks'
 import { species } from '../species'
@@ -7,8 +7,16 @@ import type { ResidentInput, Tank } from '../tank'
 import { openFishSheet } from './add-fish'
 import { h, icon } from './dom'
 import { showJoin, showLoading, showMessage } from './screens'
+import { FEED_ZONE, type TankHandlers } from './handlers'
+import { toast } from './toast'
 
-type TapHandler = (id: string) => void
+const HINT_KEY = 'tankmates-hint-play'
+
+/** One fish's photos: the face, and the optional blub face. */
+interface Faces {
+  face: CanvasImageSource
+  blub: CanvasImageSource | null
+}
 
 /** Drops /join/{code} from the address bar once it has done its job. */
 function forgetInvite() {
@@ -17,9 +25,9 @@ function forgetInvite() {
 
 /**
  * Decides where you land: the invite page, straight into your tank, or a polite "invite only".
- * `setTapHandler` receives the function to call when a fish is tapped.
+ * `handlers` is filled in with what taps should do once you're in.
  */
-export async function startShared(tank: Tank, invite: string | null, setTapHandler: (handler: TapHandler) => void) {
+export async function startShared(tank: Tank, invite: string | null, handlers: TankHandlers) {
   const loading = showLoading('Opening the tank…')
   try {
     // Only invited visitors get signed in; anyone else isn't worth an account.
@@ -31,7 +39,7 @@ export async function startShared(tank: Tank, invite: string | null, setTapHandl
       const already = tanks.find((info) => info.inviteCode === invite)
       if (already) {
         forgetInvite()
-        return await openTank(tank, already, userId, setTapHandler, false)
+        return await openTank(tank, already, userId, handlers, false)
       }
       const name = await inviteTankName(invite)
       if (!name) {
@@ -44,7 +52,7 @@ export async function startShared(tank: Tank, invite: string | null, setTapHandl
           const joined = (await myTanks()).find((info) => info.inviteCode === invite)
           if (!joined) throw new Error('Joined, but the tank could not be opened')
           forgetInvite()
-          await openTank(tank, joined, userId, setTapHandler, true)
+          await openTank(tank, joined, userId, handlers, true)
         },
         describeError,
       )
@@ -53,7 +61,7 @@ export async function startShared(tank: Tank, invite: string | null, setTapHandl
     if (!userId || tanks.length === 0) {
       return showMessage('Tankmates is invite\u2011only', 'Ask a friend in your group for the invite link, then open it on this phone.')
     }
-    await openTank(tank, tanks[0], userId, setTapHandler, false)
+    await openTank(tank, tanks[0], userId, handlers, false)
   } catch (error) {
     loading.remove()
     console.error(error)
@@ -65,40 +73,44 @@ export async function startShared(tank: Tank, invite: string | null, setTapHandl
  * Loads everyone's fish into the tank, keeps it live (new, changed and removed fish; who's online),
  * and wires up adding, editing and removing.
  */
-async function openTank(tank: Tank, info: MyTank, userId: string, setTapHandler: (handler: TapHandler) => void, addRightAway: boolean) {
+async function openTank(tank: Tank, info: MyTank, userId: string, handlers: TankHandlers, addRightAway: boolean) {
   const records = new Map<string, FishRecord>()
-  const faces = new Map<string, CanvasImageSource>()
+  const faces = new Map<string, Faces>()
   /** Who's online, by user id. Null until the first presence update: until then, nobody sleeps. */
   let online: Set<string> | null = null
   /** True while our own new fish is being saved, so its live "insert" doesn't add it twice. */
   let savingNew = false
 
   const isOnline = (ownerId: string) => ownerId === userId || online === null || online.has(ownerId)
-  const toResident = (record: FishRecord, face: CanvasImageSource): ResidentInput => ({
+  const toResident = (record: FishRecord, photos: Faces): ResidentInput => ({
     id: record.id,
     name: record.name,
     species: record.species,
     tint: record.tint,
-    face,
+    face: photos.face,
+    blub: photos.blub,
   })
 
-  async function faceFor(record: FishRecord) {
-    const url = (await signFaceUrls([record.facePath])).get(record.facePath)
-    if (!url) throw new Error(`No face URL for fish ${record.id}`)
-    return loadFace(url)
+  /** Downloads a fish's face, and its blub face if it has one. A blub that fails is skipped. */
+  async function loadPhotos(record: FishRecord, urls: Map<string, string>): Promise<Faces> {
+    const faceUrl = urls.get(record.facePath)
+    if (!faceUrl) throw new Error(`No face URL for fish ${record.id}`)
+    const blubUrl = record.faceBlubPath ? urls.get(record.faceBlubPath) : undefined
+    const [face, blub] = await Promise.all([loadFace(faceUrl), blubUrl ? loadFace(blubUrl).catch(() => null) : Promise.resolve(null)])
+    return { face, blub }
   }
+  const pathsOf = (record: FishRecord) => [record.facePath, ...(record.faceBlubPath ? [record.faceBlubPath] : [])]
+  const photosFor = async (record: FishRecord) => loadPhotos(record, await signFaceUrls(pathsOf(record)))
 
   const rows = await listFish(info.id)
-  const urls = await signFaceUrls(rows.map((row) => row.facePath))
+  const urls = await signFaceUrls(rows.flatMap(pathsOf))
   await Promise.all(
     rows.map(async (row) => {
       records.set(row.id, row)
-      const url = urls.get(row.facePath)
-      if (!url) return
       try {
-        const face = await loadFace(url)
-        faces.set(row.id, face)
-        tank.addResident(toResident(row, face))
+        const photos = await loadPhotos(row, urls)
+        faces.set(row.id, photos)
+        tank.addResident(toResident(row, photos))
       } catch (error) {
         console.warn('A face could not be loaded', row.id, error)
       }
@@ -131,11 +143,11 @@ async function openTank(tank: Tank, info: MyTank, userId: string, setTapHandler:
     }
     if (!known) {
       if (record.ownerId === userId && savingNew) return
-      const face = await faceFor(record)
+      const photos = await photosFor(record)
       if (records.has(record.id)) return
       records.set(record.id, record)
-      faces.set(record.id, face)
-      tank.addResident(toResident(record, face), { dropIn: true })
+      faces.set(record.id, photos)
+      tank.addResident(toResident(record, photos), { dropIn: true })
       tank.setAsleep(record.id, !isOnline(record.ownerId))
       // Your own fish, made on another device.
       if (record.ownerId === userId) {
@@ -148,10 +160,11 @@ async function openTank(tank: Tank, info: MyTank, userId: string, setTapHandler:
     if (Date.parse(record.updatedAt) <= Date.parse(known.updatedAt)) return
     records.set(record.id, record)
     const changes: Partial<Omit<ResidentInput, 'id'>> = { name: record.name, species: record.species, tint: record.tint }
-    if (record.facePath !== known.facePath) {
-      const face = await faceFor(record)
-      faces.set(record.id, face)
-      changes.face = face
+    if (record.facePath !== known.facePath || record.faceBlubPath !== known.faceBlubPath) {
+      const photos = await photosFor(record)
+      faces.set(record.id, photos)
+      changes.face = photos.face
+      changes.blub = photos.blub
     }
     tank.updateResident(record.id, changes)
     if (mine?.id === record.id) mine = record
@@ -177,21 +190,31 @@ async function openTank(tank: Tank, info: MyTank, userId: string, setTapHandler:
     for (const record of records.values()) tank.setAsleep(record.id, !isOnline(record.ownerId))
   }
 
+  let live: LiveTank | null = null
   try {
-    const live = await connectTank(info.id, userId, {
+    live = await connectTank(info.id, userId, {
       fish: (record) => enqueue(() => apply(record)),
       presence: (ids) => {
         online = ids
         updateSleep()
       },
       reconnected: () => enqueue(refetch),
+      // Someone else poked a fish: it reacts here too, with a note saying who did it.
+      poke: ({ fishId, by }) => {
+        const record = records.get(fishId)
+        if (!record) return
+        tank.react(fishId)
+        toast(record.ownerId === userId ? `${by} poked your fish` : `${by} poked ${record.name}`)
+      },
+      feed: ({ x, seed }) => tank.feed(x, seed),
     })
+    const connection = live
     // In the background you count as offline; coming back, catch up on anything missed.
     document.addEventListener('visibilitychange', () => {
-      live.setVisible(!document.hidden)
+      connection.setVisible(!document.hidden)
       if (!document.hidden) enqueue(refetch)
     })
-    window.addEventListener('pagehide', () => live.setVisible(false))
+    window.addEventListener('pagehide', () => connection.setVisible(false))
   } catch (error) {
     // Without the live connection the tank still works; it just needs a refresh to update.
     console.warn('Live updates are unavailable', error)
@@ -207,28 +230,48 @@ async function openTank(tank: Tank, info: MyTank, userId: string, setTapHandler:
       describeError,
       suggestedName: info.displayName.slice(0, 16),
       existing: current
-        ? { name: current.name, species: current.species, tint: current.tint, face: faces.get(current.id) ?? blankFace() }
+        ? {
+            name: current.name,
+            species: current.species,
+            tint: current.tint,
+            face: faces.get(current.id)?.face ?? blankFace(),
+            blub: faces.get(current.id)?.blub ?? null,
+          }
         : undefined,
       onSave: async (fish) => {
         if (current) {
-          const updated = await updateFish(current, { name: fish.name, species: fish.species, tint: fish.tint, face: fish.blob })
+          const updated = await updateFish(current, {
+            name: fish.name,
+            species: fish.species,
+            tint: fish.tint,
+            face: fish.blob,
+            ...(fish.blubBlob !== undefined ? { blub: fish.blubBlob } : {}),
+          })
           records.set(updated.id, updated)
-          if (fish.blob) faces.set(updated.id, fish.face)
+          faces.set(updated.id, { face: fish.face, blub: fish.blub })
           tank.updateResident(updated.id, {
             name: updated.name,
             species: updated.species,
             tint: updated.tint,
             ...(fish.blob ? { face: fish.face } : {}),
+            ...(fish.blubBlob !== undefined ? { blub: fish.blub } : {}),
           })
           mine = updated
         } else {
           if (!fish.blob) throw new Error('A photo is needed')
           savingNew = true
           try {
-            const created = await createFish(info.id, userId, { name: fish.name, species: fish.species, tint: fish.tint, face: fish.blob })
+            const created = await createFish(info.id, userId, {
+              name: fish.name,
+              species: fish.species,
+              tint: fish.tint,
+              face: fish.blob,
+              blub: fish.blubBlob ?? null,
+            })
+            const photos = { face: fish.face, blub: fish.blub }
             records.set(created.id, created)
-            faces.set(created.id, fish.face)
-            tank.addResident(toResident(created, fish.face), { dropIn: true })
+            faces.set(created.id, photos)
+            tank.addResident(toResident(created, photos), { dropIn: true })
             setTimeout(() => tank.showTag(created.id), 1400)
             mine = created
           } finally {
@@ -250,18 +293,42 @@ async function openTank(tank: Tank, info: MyTank, userId: string, setTapHandler:
     })
   }
 
-  // The tank owner can remove anyone's fish: tap it, then tap Remove twice.
+  // Tap a fish to poke it: it reacts here, and on everyone else's screen.
+  let lastPoke = 0
+  handlers.fishTap = (id) => {
+    if (!records.has(id)) return
+    tank.react(id)
+    const now = performance.now()
+    if (now - lastPoke < 250) return
+    lastPoke = now
+    live?.poke(id, info.displayName)
+  }
+
+  // Tap near the surface to drop food, for everyone.
+  let lastFeed = 0
+  handlers.waterTap = (x, y) => {
+    if (y > FEED_ZONE) return
+    const now = performance.now()
+    if (now - lastFeed < 600) return
+    lastFeed = now
+    const seed = Math.floor(Math.random() * 2 ** 31)
+    tank.feed(x, seed)
+    live?.feed(x, seed)
+  }
+
+  // The tank owner can remove anyone's fish: press and hold it, then tap Remove twice.
   const actions = createActionBar()
-  setTapHandler((id) => {
+  handlers.fishLongPress = (id) => {
     const record = records.get(id)
     if (!info.isOwner || !record || record.ownerId === userId) return
     actions.show(record.name, async () => {
       await removeFish(record)
       forget(record.id)
     })
-  })
+  }
 
   if (addRightAway && !mine) openSheet()
+  else showPlayHint()
 }
 
 /** A small bar along the bottom offering to remove a tapped fish. Hides itself after a few seconds. */
@@ -324,4 +391,15 @@ function blankFace() {
   ctx.fillStyle = '#8fa3b3'
   ctx.fillRect(0, 0, 256, 256)
   return canvas
+}
+
+/** Explains the taps once, the first time someone opens a tank after this arrived. */
+function showPlayHint() {
+  try {
+    if (localStorage.getItem(HINT_KEY)) return
+    localStorage.setItem(HINT_KEY, '1')
+  } catch {
+    return
+  }
+  window.setTimeout(() => toast('Tap a fish to poke it · tap near the surface to feed everyone', 5000), 1200)
 }

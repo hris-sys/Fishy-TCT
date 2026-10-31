@@ -55,8 +55,10 @@ export interface SpeciesConfig {
   }
   faceSlot: { x: number; y: number; size: number; rotation: number }
   mask: MaskConfig
+  /** Optional soft light on the body (the anglerfish's lure), in body art units; it flashes when tapped. */
+  glow?: { x: number; y: number; size: number }
   swim: SwimConfig
-  /** Tap animation, played from iteration 5. */
+  /** What happens when the fish is tapped: 'scatter', 'hide-in-anemone', 'puff', 'snap' or 'lure-flash'. */
   reaction: string
 }
 

@@ -19,6 +19,8 @@ Opening the app:
 - `/join/{code}` is an invite link: pick a name, join, add your fish. The first person to open a new tank's link owns it.
 - `/` takes returning visitors straight into their tank; everyone else sees "invite-only".
 
+In the tank: tap a fish to poke it (everyone sees it react), tap near the surface to feed, and press and hold someone's fish to remove it if you own the tank. The speaker button in the corner mutes sounds.
+
 URL options:
 
 - `?debug` shows an FPS readout and the **Tune** panel for live species tuning. **Copy config** puts the tuned numbers on the clipboard, ready to paste into `src/species/<id>/config.ts`.

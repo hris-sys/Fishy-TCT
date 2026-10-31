@@ -1,7 +1,7 @@
 import type { SpeciesConfig } from '../tank'
 import { type Cropper, createCropper } from './cropper'
 import { h, icon } from './dom'
-import { type FacePhoto, exportFace, loadPhoto } from './photo'
+import { exportFace, loadPhoto } from './photo'
 import { type PickerInitial, type PickerValue, createSpeciesPicker } from './species-picker'
 
 export interface NewFish {
@@ -12,12 +12,16 @@ export interface NewFish {
   face: CanvasImageSource
   /** The newly encoded face file, or null when the face didn't change. */
   blob: Blob | null
+  /** The blub ("O" mouth) face to show, if any. */
+  blub: CanvasImageSource | null
+  /** A newly encoded blub file; null when it was removed; undefined when it didn't change. */
+  blubBlob?: Blob | null
 }
 
 interface FishSheetOptions {
   species: SpeciesConfig[]
   /** Editing an existing fish: opens on the species step with its current face. */
-  existing?: { name: string; species: string; tint: number | null; face: CanvasImageSource }
+  existing?: { name: string; species: string; tint: number | null; face: CanvasImageSource; blub: CanvasImageSource | null }
   /** Name to suggest for a new fish. */
   suggestedName?: string
   /** Saves the fish. If it throws, the sheet stays open and shows `describeError`'s message. */
@@ -39,7 +43,13 @@ export function openFishSheet(options: FishSheetOptions) {
   document.body.append(root)
 
   let leaveStep: (() => void) | null = null
-  let cropper: { photo: HTMLCanvasElement; cropper: Cropper } | null = null
+  let cropper: { photo: HTMLCanvasElement; cropper: Cropper; kind: 'face' | 'blub' } | null = null
+  /** The face being used: the existing one, or a newly cropped one (with its file). */
+  let face: { canvas: CanvasImageSource; blob: Blob | null } | null = options.existing ? { canvas: options.existing.face, blob: null } : null
+  let blub: { canvas: CanvasImageSource; blob: Blob | null } | null = options.existing?.blub ? { canvas: options.existing.blub, blob: null } : null
+  let blubChanged = false
+  /** Which photo the photo and crop steps are taking. */
+  type PhotoKind = 'face' | 'blub'
   // Choices survive going back to change the photo.
   let choices: PickerInitial = options.existing
     ? { name: options.existing.name, species: options.existing.species, tint: options.existing.tint }
@@ -75,7 +85,7 @@ export function openFishSheet(options: FishSheetOptions) {
     )
 
   // Step 1: a selfie or a photo from the library. On phones, capture="user" opens the front camera.
-  function photoStep(error?: string) {
+  function photoStep(error?: string, kind: PhotoKind = 'face') {
     const pick = (label: string, iconName: 'camera' | 'image', selfie: boolean) => {
       const input = h('input', {
         type: 'file',
@@ -85,12 +95,13 @@ export function openFishSheet(options: FishSheetOptions) {
         onchange: () => {
           const file = input.files?.[0]
           input.value = ''
-          if (file) choose(file)
+          if (file) choose(file, kind)
         },
       })
       return h('label', { class: selfie ? 'button primary big' : 'button big' }, input, icon(iconName), label)
     }
-    const back = editing && options.existing ? () => speciesStep({ canvas: options.existing!.face, blob: null }) : undefined
+    const back = face ? () => speciesStep() : undefined
+    const blubbing = kind === 'blub'
     show(
       h(
         'div',
@@ -99,8 +110,14 @@ export function openFishSheet(options: FishSheetOptions) {
         h(
           'div',
           { class: 'intro' },
-          h('h1', {}, editing ? 'New photo' : 'Add your fish'),
-          h('p', {}, 'Your face goes on a fish. Use a clear photo, looking straight at the camera.'),
+          h('h1', {}, blubbing ? 'Blub face' : editing ? 'New photo' : 'Add your fish'),
+          h(
+            'p',
+            {},
+            blubbing
+              ? 'Make an “O” with your mouth, like a fish going blub. Your fish shows it while eating or when someone pokes it.'
+              : 'Your face goes on a fish. Use a clear photo, looking straight at the camera.',
+          ),
           error ? h('p', { class: 'error', role: 'alert' }, error) : null,
           h('div', { class: 'stack' }, pick('Take a selfie', 'camera', true), pick('Choose a photo', 'image', false)),
           h('p', { class: 'note' }, 'Only a small square around your face is kept. The original photo never leaves your phone.'),
@@ -109,21 +126,21 @@ export function openFishSheet(options: FishSheetOptions) {
     )
   }
 
-  async function choose(file: File) {
-    show(h('div', { class: 'step' }, header('Line up your face', () => photoStep()), h('p', { class: 'loading' }, 'Opening photo…')))
+  async function choose(file: File, kind: PhotoKind) {
+    show(h('div', { class: 'step' }, header('Line up your face', () => photoStep(undefined, kind)), h('p', { class: 'loading' }, 'Opening photo…')))
     try {
       const photo = await loadPhoto(file)
       cropper?.cropper.destroy()
-      cropper = { photo, cropper: createCropper(photo) }
-      cropStep()
+      cropper = { photo, cropper: createCropper(photo), kind }
+      cropStep(kind)
     } catch {
-      photoStep('That photo could not be opened. Try a JPEG or PNG, or take a selfie.')
+      photoStep('That photo could not be opened. Try a JPEG or PNG, or take a selfie.', kind)
     }
   }
 
   // Step 2: line up the face in the oval.
-  function cropStep() {
-    if (!cropper) return photoStep()
+  function cropStep(kind: PhotoKind = 'face') {
+    if (!cropper) return photoStep(undefined, kind)
     const { photo, cropper: crop } = cropper
     const use = h(
       'button',
@@ -133,11 +150,17 @@ export function openFishSheet(options: FishSheetOptions) {
         onclick: async () => {
           use.disabled = true
           try {
-            const face = await exportFace(photo, crop.crop())
-            speciesStep({ canvas: face.canvas, blob: face.blob })
+            const cropped = await exportFace(photo, crop.crop())
+            if (kind === 'blub') {
+              blub = { canvas: cropped.canvas, blob: cropped.blob }
+              blubChanged = true
+            } else {
+              face = { canvas: cropped.canvas, blob: cropped.blob }
+            }
+            speciesStep()
           } catch {
             use.disabled = false
-            photoStep('Something went wrong saving that photo. Please try again.')
+            photoStep('Something went wrong saving that photo. Please try again.', kind)
           }
         },
       },
@@ -147,7 +170,7 @@ export function openFishSheet(options: FishSheetOptions) {
       h(
         'div',
         { class: 'step fill' },
-        header('Line up your face', () => photoStep()),
+        header(kind === 'blub' ? 'Line up your blub face' : 'Line up your face', () => photoStep(undefined, kind)),
         crop.element,
         h('div', { class: 'step-footer' }, h('p', { class: 'hint' }, 'Drag to move, pinch to zoom. Fit your face inside the oval.'), use),
       ),
@@ -155,7 +178,9 @@ export function openFishSheet(options: FishSheetOptions) {
   }
 
   // Step 3: species, name and colour, with the face on every fish in a mini tank.
-  function speciesStep(face: { canvas: CanvasImageSource; blob: FacePhoto['blob'] | null }) {
+  function speciesStep() {
+    if (!face) return photoStep()
+    const current = face
     const message = h('p', { class: 'form-error', role: 'alert', hidden: true })
     const saveLabel = editing ? 'Save changes' : 'Drop it in'
     const save = h('button', { type: 'button', class: 'button primary', disabled: !choices.name, onclick: () => void submit() }, saveLabel)
@@ -172,7 +197,13 @@ export function openFishSheet(options: FishSheetOptions) {
       save.textContent = 'Saving…'
       message.hidden = true
       try {
-        await options.onSave({ ...chosen, face: face.canvas, blob: face.blob })
+        await options.onSave({
+          ...chosen,
+          face: current.canvas,
+          blob: current.blob,
+          blub: blub?.canvas ?? null,
+          blubBlob: blubChanged ? (blub?.blob ?? null) : undefined,
+        })
         close()
       } catch (error) {
         fail(error)
@@ -182,14 +213,38 @@ export function openFishSheet(options: FishSheetOptions) {
     }
 
     const picker = createSpeciesPicker(
-      face.canvas,
+      current.canvas,
       options.species,
       (value) => {
         choices = value
         save.disabled = value.name.length === 0
       },
       choices,
+      blub?.canvas ?? null,
     )
+
+    // Optional blub face: a small preview, with buttons to add, change or remove it.
+    const blubRow = h('div', { class: 'blub-row' })
+    if (blub) {
+      const thumb = h('canvas', { class: 'blub-thumb', width: 88, height: 88, 'aria-label': 'Your blub face' })
+      thumb.getContext('2d')!.drawImage(blub.canvas, 0, 0, 88, 88)
+      blubRow.append(
+        thumb,
+        h('button', { type: 'button', class: 'button small', onclick: () => photoStep(undefined, 'blub') }, 'Change'),
+        h('button', {
+          type: 'button',
+          class: 'button small',
+          onclick: () => {
+            blub = null
+            blubChanged = true
+            speciesStep()
+          },
+        }, 'Remove'),
+      )
+    } else {
+      blubRow.append(h('button', { type: 'button', class: 'button small', onclick: () => photoStep(undefined, 'blub') }, 'Add a blub face'))
+    }
+    const blubField = h('div', { class: 'field' }, 'Blub face (optional): an “O” mouth for eating and pokes', blubRow)
 
     // Removing takes two taps, so it can't happen by accident.
     let armed = false
@@ -223,13 +278,14 @@ export function openFishSheet(options: FishSheetOptions) {
       : null
 
     const newPhoto = editing ? h('button', { type: 'button', class: 'button', onclick: () => photoStep() }, icon('camera'), 'New photo') : null
-    const back = editing ? undefined : () => cropStep()
+    const back = editing ? undefined : () => cropStep(cropper?.kind)
     show(
       h(
         'div',
         { class: 'step' },
         header(editing ? 'Your fish' : 'Pick your fish', back),
         picker.element,
+        blubField,
         h('div', { class: 'step-footer' }, message, newPhoto, save, remove),
       ),
       () => picker.destroy(),
@@ -237,6 +293,6 @@ export function openFishSheet(options: FishSheetOptions) {
     void picker.start()
   }
 
-  if (options.existing) speciesStep({ canvas: options.existing.face, blob: null })
+  if (face) speciesStep()
   else photoStep()
 }

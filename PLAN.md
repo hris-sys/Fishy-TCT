@@ -190,13 +190,17 @@ _Headless end-to-end with two browsers against the real project: a new fish appe
 
 Goal: reasons to open it every day.
 
-- [ ] Tap reactions per species, as listed in the five fish table.
-- [ ] Pokes: tapping a friend's fish plays its reaction on every open screen, with an "A poked B" toast sent over Broadcast.
-- [ ] Feeding: tap the surface to drop flakes and nearby fish race for them. Drops are broadcast so everyone sees the same feeding.
-- [ ] Blub mode: an optional second photo with an "O" mouth, stored as `face_blub_path`. Fish switch between the two faces while eating or when poked.
-- [ ] Sound: bubbles and splashes, off until the first tap because of mobile autoplay rules, plus a mute toggle.
+- [x] Tap reactions per species, as listed in the five fish table.
+- [x] Pokes: tapping a friend's fish plays its reaction on every open screen, with an "A poked B" toast sent over Broadcast.
+- [x] Feeding: tap the surface to drop flakes and nearby fish race for them. Drops are broadcast so everyone sees the same feeding.
+- [x] Blub mode: an optional second photo with an "O" mouth, stored as `face_blub_path`. Fish switch between the two faces while eating or when poked.
+- [x] Sound: bubbles and splashes, off until the first tap because of mobile autoplay rules, plus a mute toggle.
+
+_Taps on the top 22% of the tank feed; the same random seed goes out with each drop, so every screen scatters the flakes identically. Since a tap now pokes, the tank owner removes someone's fish with a long press instead. Sounds are synthesized with Web Audio (no audio files); the mute choice is remembered per device._
 
 **Done when:** a poke or a feed on one phone shows up on the others in under a second.
+
+_Headless end-to-end with two browsers against the real project: a poke reached the other screen in ~80 ms (the fish reacted there too, switching to its blub face) and a feed in ~55 ms. Still to confirm on real phones._
 
 ## Iteration 6 · Polish and keep-alive (1–2 evenings)
 

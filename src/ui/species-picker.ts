@@ -45,6 +45,7 @@ export function createSpeciesPicker(
   species: SpeciesConfig[],
   onChange: (value: PickerValue) => void,
   initial: PickerInitial = {},
+  blub: CanvasImageSource | null = null,
 ): SpeciesPicker {
   let selected = species.some((config) => config.id === initial.species) ? initial.species! : species[0].id
   let tint: number | null = initial.tint ?? null
@@ -114,13 +115,17 @@ export function createSpeciesPicker(
         species,
         scenery: 'simple',
         zoom: 1.9,
-        onFishTap: (id) => select(id.replace('preview-', '')),
+        // Tapping a fish picks its species and plays its reaction (showing the blub face, if any).
+        onFishTap: (id) => {
+          select(id.replace('preview-', ''))
+          tank?.react(id)
+        },
       })
       // The step may have been left while the tank was loading.
       if (destroyed) return created.destroy()
       tank = created
       for (const config of species) {
-        tank.addResident({ id: previewId(config.id), name: config.label, species: config.id, tint, face })
+        tank.addResident({ id: previewId(config.id), name: config.label, species: config.id, tint, face, blub })
       }
       select(selected)
     },

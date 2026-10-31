@@ -1,3 +1,4 @@
+import { type ChatMessage, messageFromRow } from './chat'
 import { type FishRecord, fromRow } from './fish'
 import { db } from './supabase'
 
@@ -12,6 +13,8 @@ export interface LiveHandlers {
   poke(poke: { fishId: string; by: string }): void
   /** Someone dropped food: `x` is a fraction of the width, `seed` scatters the flakes. */
   feed(feed: { x: number; seed: number }): void
+  /** A new chat message. */
+  message(message: ChatMessage): void
 }
 
 export interface LiveTank {
@@ -38,6 +41,10 @@ export async function connectTank(tankId: string, userId: string, handlers: Live
   channel.on('postgres_changes', { event: '*', schema: 'public', table: 'fish', filter: `tank_id=eq.${tankId}` }, (payload) => {
     const row = payload.new as Record<string, unknown> | undefined
     if (row && 'id' in row) handlers.fish(fromRow(row))
+  })
+  channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `tank_id=eq.${tankId}` }, (payload) => {
+    const row = payload.new as Record<string, unknown> | undefined
+    if (row && 'id' in row) handlers.message(messageFromRow(row))
   })
   channel.on('presence', { event: 'sync' }, () => handlers.presence(new Set(Object.keys(channel.presenceState()))))
 

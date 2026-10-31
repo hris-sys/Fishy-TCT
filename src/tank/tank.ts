@@ -74,6 +74,8 @@ export interface Tank {
   setPlaceholders(count: number): void
   /** Shows someone's name tag, as if their fish was tapped. */
   showTag(id: string): void
+  /** Shows a speech bubble above someone's fish, with their name and the message. */
+  say(id: string, text: string): void
   /** Plays the tap reaction of someone's fish (the whole school, for a school). */
   react(id: string): void
   /** Drops food at a fraction of the width. The same seed scatters it the same way on every screen. */
@@ -237,6 +239,10 @@ export async function createTank(host: HTMLElement, options: TankOptions): Promi
     showTag(id) {
       const first = fish.firstFishOf(id)
       if (first) tags.show(first)
+    },
+    say(id, text) {
+      const first = fish.firstFishOf(id)
+      if (first) tags.say(first, text)
     },
     react: (id) => fish.react(id),
     feed(xFraction, seed) {

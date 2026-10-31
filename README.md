@@ -21,7 +21,7 @@ Opening the app:
 
 On a phone, add it to the home screen from the menu (⋯, top right). On an iPhone, the Home Screen app keeps its own sign-in, separate from Safari, so the menu shows a one-time code to type into it; the same code moves you to a new phone ("Use on another device"). For a TV or big screen, open the invite link with `?tv=1` on the end (join under a name like "Living room TV"); after that, `/?tv=1` shows the tank with bigger fish, rotating name tags and no buttons.
 
-In the tank: tap a fish to poke it (everyone sees it react), tap near the surface to feed, and press and hold someone's fish to remove it if you own the tank. The speaker button in the corner mutes sounds.
+In the tank: tap a fish to poke it (everyone sees it react), tap near the surface to feed, and press and hold someone's fish to remove it if you own the tank. The see-through chat in the bottom-left corner is for the tank's members; each message also pops up above its author's fish (on a TV, that's all you see). The speaker button in the corner mutes sounds.
 
 URL options:
 

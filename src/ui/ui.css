@@ -723,3 +723,156 @@ body.tv {
     opacity: 0;
   }
 }
+
+/* Chat: a small see-through window, bottom left, above the "Your fish" button. No blur behind it:
+   blurring a moving canvas every frame costs too much on phones. */
+.chat {
+  --keyboard: 0px;
+  position: fixed;
+  left: calc(env(safe-area-inset-left) + 12px);
+  bottom: calc(env(safe-area-inset-bottom) + 80px + var(--keyboard));
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  width: min(300px, calc(100vw - 24px));
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 16px;
+  background: rgba(4, 26, 46, 0.28);
+  color: var(--ink);
+  font: 14px/1.35 var(--ui-font);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+}
+
+.chat-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 4px 0 12px;
+  font-weight: 650;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.chat-hide {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.chat-hide .icon {
+  width: 18px;
+  height: 18px;
+}
+
+.chat-log {
+  max-height: min(150px, 22vh);
+  margin: 0;
+  padding: 2px 12px 6px;
+  overflow-y: auto;
+  list-style: none;
+  overflow-wrap: anywhere;
+  scrollbar-width: none;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.chat-line + .chat-line {
+  margin-top: 3px;
+}
+
+.chat-empty {
+  color: var(--ink-soft);
+  font-style: italic;
+}
+
+.chat-form {
+  display: flex;
+  gap: 6px;
+  padding: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* 16px or more, so iOS doesn't zoom in on focus. */
+.chat-input {
+  flex: 1;
+  min-width: 0;
+  height: 38px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--ink);
+  font: 16px var(--ui-font);
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.chat-input::placeholder {
+  color: rgba(242, 250, 254, 0.55);
+}
+
+.chat-input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 0;
+}
+
+.chat-send {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-ink);
+  cursor: pointer;
+}
+
+.chat-send .icon {
+  width: 18px;
+  height: 18px;
+}
+
+.chat-toggle {
+  position: fixed;
+  left: calc(env(safe-area-inset-left) + 12px);
+  bottom: calc(env(safe-area-inset-bottom) + 20px);
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 50%;
+  background: rgba(4, 26, 46, 0.45);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.chat-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font: 700 12px/20px var(--ui-font);
+  text-align: center;
+}
+
+.chat.away,
+.chat-toggle.away {
+  display: none;
+}

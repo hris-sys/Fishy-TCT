@@ -220,6 +220,11 @@ _Keep-alive: Vercel Cron calls `/api/keepalive` daily, which runs `keepalive()` 
 
 _Merged to production (Oct 31, 2026) after passing on two devices; `/api/keepalive` answers from the database in production. Headless end-to-end (13/13): moving to a new device with a code, TV mode, invite sharing, wrong-code message. Still to watch: installing on iOS and Android from production, a quiet week, and a new friend joining unaided._
 
+## After the plan
+
+- [x] TCTank, the group's final tank. People in several tanks land in the one they used last on that device (or the newest joined).
+- [ ] Chat: a small see-through window for each tank's members, with the last 50 messages kept; new messages also appear as speech bubbles above the author's fish. Members-only (RLS), names filled in by the database, a little rate limit, and messages move with you to a new device.
+
 ## Gotchas
 
 Four known traps, each already handled in the plan.

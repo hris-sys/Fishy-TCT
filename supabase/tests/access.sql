@@ -108,6 +108,13 @@ update public.fish set name = 'Bubbly', tint = 16757928 where owner_id = 'bbbbbb
 select access_test.expect((select name from public.fish where owner_id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb') = 'Bubbly', 'people edit their own fish');
 update public.tank_members set display_name = 'Bea B' where user_id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 select access_test.expect((select display_name from public.my_tanks()) = 'Bea B', 'members rename themselves');
+insert into public.messages (tank_id, body) values ('11111111-1111-4111-8111-111111111111', '  hello tank  ');
+select access_test.expect((select author_name || ':' || body from public.messages) = 'Bea B:hello tank', 'members chat, under their own name');
+select access_test.expect_error($$insert into public.messages (tank_id, body) values ('11111111-1111-4111-8111-111111111111', 'again')$$, 'chat has a little breathing room between messages');
+select access_test.expect_error($$insert into public.messages (tank_id, author_id, body) values ('11111111-1111-4111-8111-111111111111', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'fake')$$, 'nobody posts as someone else');
+select access_test.expect_error($$insert into public.messages (tank_id, author_name, body) values ('11111111-1111-4111-8111-111111111111', 'Alice', 'fake')$$, 'nobody picks their own author name');
+select access_test.expect_error($$insert into public.messages (tank_id, body) values ('22222222-2222-4222-8222-222222222222', 'hi')$$, 'nobody chats in a tank they have not joined');
+select access_test.expect_error($$insert into public.messages (tank_id, body) values ('11111111-1111-4111-8111-111111111111', repeat('x', 201))$$, 'chat messages stay short');
 select access_test.expect(private.can_use_tank_channel('tank:11111111-1111-4111-8111-111111111111'), 'members may use their tank''s live channel');
 select access_test.expect(not private.can_use_tank_channel('tank:22222222-2222-4222-8222-222222222222'), 'members may not use other tanks'' channels');
 
@@ -119,6 +126,8 @@ select access_test.expect((select count(*) from public.fish) = 0, 'outsiders see
 select access_test.expect((select count(*) from public.tank_members) = 0, 'outsiders see no members');
 select access_test.expect((select count(*) from storage.objects where bucket_id = 'faces') = 0, 'outsiders see no faces');
 select access_test.expect((select count(*) from public.my_tanks()) = 0, 'outsiders have no tanks');
+select access_test.expect((select count(*) from public.messages) = 0, 'outsiders read no chat');
+select access_test.expect_error($$insert into public.messages (tank_id, body) values ('11111111-1111-4111-8111-111111111111', 'hi')$$, 'outsiders cannot chat');
 select access_test.expect(public.invite_tank_name('nope-nope-nope') is null, 'a wrong invite code reveals nothing');
 select access_test.expect(not private.can_use_tank_channel('tank:11111111-1111-4111-8111-111111111111'), 'outsiders may not use a tank''s live channel');
 select access_test.expect_error($$insert into storage.objects (bucket_id, name)
@@ -135,6 +144,7 @@ reset role;
 set local role anon;
 select access_test.expect_error($$select count(*) from public.fish$$, 'signed-out visitors cannot read fish');
 select access_test.expect_error($$select count(*) from public.tank_members$$, 'signed-out visitors cannot read members');
+select access_test.expect_error($$select count(*) from public.messages$$, 'signed-out visitors cannot read chat');
 select access_test.expect_error($$select public.my_tanks()$$, 'signed-out visitors cannot list tanks');
 select access_test.expect_error($$select public.join_tank('access-test-invite', 'Sneak')$$, 'signed-out visitors cannot join');
 select access_test.expect((select count(*) from storage.objects where bucket_id = 'faces') = 0, 'signed-out visitors see no faces');
@@ -171,6 +181,7 @@ select access_test.expect_error($$select public.claim_device_code('WRONGCOD')$$,
 select access_test.expect(public.claim_device_code(lower(current_setting('access_test.code'))) = 1, 'a device code moves your tank to the new device');
 select access_test.expect((select count(*) from public.fish where owner_id = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc' and deleted_at is null) = 1, 'your fish comes along');
 select access_test.expect((select display_name from public.my_tanks()) = 'Bea B', 'your name comes along');
+select access_test.expect((select count(*) from public.messages where author_id = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc') = 1, 'your chat messages come along');
 select access_test.expect_error($$select public.claim_device_code(current_setting('access_test.code'))$$, 'a device code works only once');
 update public.fish set name = 'Moved' where owner_id = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 select access_test.expect((select name from public.fish where owner_id = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc' and deleted_at is null) = 'Moved', 'the moved fish can be edited, its face staying put');

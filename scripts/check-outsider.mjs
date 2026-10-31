@@ -32,7 +32,7 @@ const rows = async (table) => {
   const { data, error } = await db.from(table).select('*')
   return error ? { count: 0, detail: `refused (${error.code ?? error.message})` } : { count: data.length, detail: `${data.length} rows` }
 }
-for (const table of ['fish', 'tank_members', 'tanks']) {
+for (const table of ['fish', 'tank_members', 'tanks', 'messages']) {
   const result = await rows(table)
   report(`read ${table}`, result.count > 0, result.detail)
 }

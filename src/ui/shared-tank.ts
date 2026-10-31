@@ -1,5 +1,6 @@
 import { type FishRecord, createFish, describeError, errorDetail, listFish, loadFace, removeFish, signFaceUrls, updateFish } from '../data/fish'
 import { type LiveTank, connectTank } from '../data/live'
+import { type ChatMessage, listMessages, sendMessage } from '../data/chat'
 import { claimDeviceCode } from '../data/devices'
 import { currentUserId, ensureSignedIn } from '../data/session'
 import { type MyTank, inviteTankName, joinTank, myTanks } from '../data/tanks'
@@ -7,6 +8,7 @@ import { species } from '../species'
 import type { ResidentInput, Tank } from '../tank'
 import { openFishSheet } from './add-fish'
 import { h, icon } from './dom'
+import { createChat } from './chat'
 import { createMenu } from './menu'
 import { showJoin, showLoading, showMessage, showWelcome } from './screens'
 import { FEED_ZONE, type TankHandlers } from './handlers'
@@ -229,6 +231,15 @@ async function openTank(tank: Tank, info: MyTank, userId: string, handlers: Tank
     for (const record of records.values()) tank.setAsleep(record.id, !isOnline(record.ownerId))
   }
 
+  // Chat: messages go in the chat window (not on a TV) and pop up above the author's fish.
+  let chat: ReturnType<typeof createChat> | null = null
+  const fishOf = (authorId: string) => [...records.values()].find((record) => record.ownerId === authorId && !record.deletedAt)
+  function hear(message: ChatMessage, fresh: boolean) {
+    chat?.add(message, fresh)
+    const fish = fresh ? fishOf(message.authorId) : undefined
+    if (fish) tank.say(fish.id, message.body)
+  }
+
   let live: LiveTank | null = null
   try {
     live = await connectTank(info.id, userId, {
@@ -246,6 +257,7 @@ async function openTank(tank: Tank, info: MyTank, userId: string, handlers: Tank
         if (!options.tv) toast(record.ownerId === userId ? `${by} poked your fish` : `${by} poked ${record.name}`)
       },
       feed: ({ x, seed }) => tank.feed(x, seed),
+      message: (message) => hear(message, true),
     })
     const connection = live
     // In the background you count as offline; coming back, catch up on anything missed.
@@ -262,6 +274,7 @@ async function openTank(tank: Tank, info: MyTank, userId: string, handlers: Tank
   function openSheet() {
     button.hidden = true
     actions.hide()
+    chat?.setHidden(true)
     tank.setPaused(true)
     const current = mine
     openFishSheet({
@@ -328,6 +341,7 @@ async function openTank(tank: Tank, info: MyTank, userId: string, handlers: Tank
       onClose: () => {
         tank.setPaused(false)
         button.hidden = false
+        chat?.setHidden(false)
       },
     })
   }
@@ -371,10 +385,25 @@ async function openTank(tank: Tank, info: MyTank, userId: string, handlers: Tank
     return
   }
 
+  chat = createChat(async (body) => {
+    try {
+      hear(await sendMessage(info.id, body), true)
+    } catch (error) {
+      toast(describeError(error))
+      throw error
+    }
+  })
+  listMessages(info.id)
+    .then((history) => {
+      for (const message of history) chat?.add(message, false)
+    })
+    .catch((error) => console.warn('Chat history could not be loaded', error))
+
   // The menu: invite a friend, add to the home screen, move to another device.
   const menu = createMenu(info, (open) => {
     tank.setPaused(open)
     button.hidden = open
+    chat?.setHidden(open)
     actions.hide()
   })
   document.body.append(menu.button)

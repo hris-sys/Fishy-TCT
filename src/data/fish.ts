@@ -172,6 +172,8 @@ export function describeError(error: unknown): string {
   if (e?.message?.toLowerCase().includes('captcha')) return 'Supabase is asking for a CAPTCHA, which this app doesn’t show. Turn off CAPTCHA protection in Supabase (Authentication → Attack Protection).'
   const name = (error as { name?: string } | null)?.name
   const message = e?.message?.toLowerCase() ?? ''
+  if (message.includes('slow down')) return 'Slow down a little.'
+  if (message.includes('only members can chat')) return 'Only members of this tank can chat here.'
   if (message.includes('code is wrong')) return 'That code is wrong or has expired. Make a new one on your other device.'
   if (message.includes('join a tank first')) return 'Join a tank on this device first.'
   if (message.includes('maximum allowed size') || message.includes('payload too large')) return 'That photo is too large to upload. Please try another one.'

@@ -90,6 +90,8 @@ export function createChat(send: (body: string) => Promise<void>): Chat {
     try {
       await send(body)
       input.value = ''
+    } catch {
+      // The sender already said why; the text stays in the box to try again.
     } finally {
       sendButton.disabled = false
       input.focus()

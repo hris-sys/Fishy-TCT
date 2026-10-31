@@ -734,10 +734,10 @@ body.tv {
   z-index: 5;
   display: flex;
   flex-direction: column;
-  width: min(300px, calc(100vw - 24px));
+  width: min(260px, calc(100vw - 24px));
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 16px;
-  background: rgba(4, 26, 46, 0.28);
+  background: rgba(4, 26, 46, 0.36);
   color: var(--ink);
   font: 14px/1.35 var(--ui-font);
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
@@ -772,7 +772,7 @@ body.tv {
 }
 
 .chat-log {
-  max-height: min(150px, 22vh);
+  max-height: min(120px, 18vh);
   margin: 0;
   padding: 2px 12px 6px;
   overflow-y: auto;

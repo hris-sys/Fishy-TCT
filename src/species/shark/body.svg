@@ -1,18 +1,31 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="220" height="100" viewBox="0 0 220 100">
   <defs>
-    <clipPath id="body"><path d="M14 52 C40 34 90 26 140 28 C178 30 206 40 214 52 C206 62 180 72 140 74 C90 76 40 66 14 52 Z"/></clipPath>
+    <linearGradient id="skin" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#55687a"/>
+      <stop offset="0.42" stop-color="#8697a6"/>
+      <stop offset="0.56" stop-color="#c7d1d9"/>
+      <stop offset="0.66" stop-color="#f0f3f5"/>
+      <stop offset="1" stop-color="#e2e7ea"/>
+    </linearGradient>
+    <linearGradient id="fin" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#47596a"/>
+      <stop offset="1" stop-color="#7a8c9b"/>
+    </linearGradient>
+    <linearGradient id="pec" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7a8c9b"/>
+      <stop offset="1" stop-color="#4a5b6b"/>
+    </linearGradient>
   </defs>
-  <g fill="#7f95ab" stroke="#4a5c70" stroke-width="3" stroke-linejoin="round">
-    <path d="M90 32 C98 16 108 4 122 2 C120 14 122 24 132 30 Z"/>
-    <path d="M42 62 L32 76 L54 66 Z"/>
-    <path d="M14 52 C40 34 90 26 140 28 C178 30 206 40 214 52 C206 62 180 72 140 74 C90 76 40 66 14 52 Z"/>
+  <path d="M88 32 C96 16 106 4 120 2 C118 14 120 24 132 30 Z" fill="url(#fin)"/>
+  <path d="M113 5 C116 3 119 2 120 2 C119.4 6 119.2 9 119.6 12 C117 10 114.5 7.5 113 5 Z" fill="#1d252c"/>
+  <path d="M40 46 L30 36 L50 42 Z" fill="url(#fin)"/>
+  <path d="M44 62 L34 74 L56 66 Z" fill="url(#fin)"/>
+  <path d="M14 52 C40 34 90 26 140 28 C178 30 206 40 214 52 C206 62 180 72 140 74 C90 76 40 66 14 52 Z" fill="url(#skin)" stroke="#33414d" stroke-opacity="0.3" stroke-width="1.2"/>
+  <g fill="none" stroke="#3e4d5a" stroke-opacity="0.45" stroke-width="1.4" stroke-linecap="round">
+    <path d="M146 40 q-4 9 0 18"/>
+    <path d="M152 40 q-4 9 0 18"/>
+    <path d="M158 41 q-4 8 0 16"/>
   </g>
-  <path clip-path="url(#body)" d="M0 57 C60 66 150 66 220 50 L220 100 L0 100 Z" fill="#eef3f6"/>
-  <path d="M14 52 C40 34 90 26 140 28 C178 30 206 40 214 52 C206 62 180 72 140 74 C90 76 40 66 14 52 Z" fill="none" stroke="#4a5c70" stroke-width="3"/>
-  <g fill="none" stroke="#4a5c70" stroke-width="2.5" stroke-linecap="round">
-    <path d="M146 40 q-5 10 0 20"/>
-    <path d="M153 40 q-5 10 0 20"/>
-    <path d="M160 41 q-4 9 0 18"/>
-  </g>
-  <path d="M118 66 C110 80 100 92 92 98 C110 94 128 84 138 70 Z" fill="#7f95ab" stroke="#4a5c70" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M120 66 C112 80 102 92 92 98 C110 94 128 84 140 70 Z" fill="url(#pec)"/>
+  <path d="M92 98 C96 95 100 93 104 91 C101 94 97 96 92 98 Z" fill="#1d252c"/>
 </svg>

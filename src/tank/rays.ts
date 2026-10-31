@@ -36,7 +36,7 @@ export function createRays(): SceneLayer {
     update(_dt, time) {
       for (const ray of rays) {
         const wave = Math.sin(time * ray.speed + ray.phase)
-        ray.sprite.alpha = 0.13 + 0.07 * wave
+        ray.sprite.alpha = 0.1 + 0.05 * wave
         ray.sprite.rotation = 0.2 + 0.05 * wave
       }
     },

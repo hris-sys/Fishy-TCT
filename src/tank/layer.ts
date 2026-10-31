@@ -6,6 +6,8 @@ export interface TankWorld {
   height: number
   /** Size multiplier so fish and decor look the same on a phone and on a TV. */
   scale: number
+  /** Device pixels per CSS pixel, for layers that draw their own canvases. */
+  resolution: number
   /** Top edge of the sand. */
   sandY: number
   /** Where the anemone sits; clownfish keep coming back to it. */

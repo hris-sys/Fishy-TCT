@@ -1,11 +1,15 @@
 import { Application } from 'pixi.js'
 import { createAnemone } from './anemone'
+import { createParticles, createSurface, createVignette } from './atmosphere'
+import { createBackdrop } from './backdrop'
 import { createBubbles } from './bubbles'
+import { createCaustics } from './caustics'
+import { createFishLayer } from './fish-layer'
 import type { SceneLayer, TankWorld } from './layer'
 import { createPlants } from './plants'
 import { createRays } from './rays'
+import { createReef } from './reef'
 import { createSand } from './sand'
-import { createSchool } from './school'
 import { type SpeciesConfig, loadSpecies } from './species'
 import { clamp } from './util'
 import { createWater } from './water'
@@ -27,11 +31,15 @@ export interface TankStats {
   width: number
   height: number
   resolution: number
+  /** People in the tank. */
+  people: number
+  /** Fish on screen; schools make this larger than `people`. */
   fish: number
 }
 
 export interface Tank {
   stats(): TankStats
+  /** People in the tank (each is one fish, or one school). */
   fishCount(): number
   setFishCount(count: number): void
   /** Call after changing a species' mask, so its faces are re-cut. Other config changes apply live. */
@@ -47,7 +55,14 @@ function layout(width: number, height: number): TankWorld {
   const scale = clamp(Math.min(width, height) / REFERENCE_SIZE, 0.7, 2.2)
   const sandHeight = Math.max(44 * scale, height * 0.1)
   const sandY = height - sandHeight
-  return { width, height, scale, sandY, anemone: { x: width * 0.72, y: sandY + sandHeight * 0.3 } }
+  return {
+    width,
+    height,
+    scale,
+    resolution: screenResolution(),
+    sandY,
+    anemone: { x: width * 0.72, y: sandY + sandHeight * 0.3 },
+  }
 }
 
 /** Mounts a fullscreen tank inside `host`, which should fill the viewport. */
@@ -63,16 +78,23 @@ export async function createTank(host: HTMLElement, options: TankOptions): Promi
   })
 
   const species = await loadSpecies(options.species)
-  const school = createSchool(species)
-  // Back to front.
+  const fish = createFishLayer(species)
+  // Back to front. Rocks and corals come before the sand so their bases sink into it.
   const layers: SceneLayer[] = [
     createWater(),
+    createBackdrop(),
     createRays(),
-    createPlants(),
+    createPlants('back'),
+    createReef(),
     createSand(),
+    createCaustics(),
     createAnemone(),
-    school,
+    fish,
+    createPlants('front'),
+    createParticles(),
     createBubbles(),
+    createSurface(),
+    createVignette(),
   ]
   for (const layer of layers) app.stage.addChild(layer.view)
   host.appendChild(app.canvas)
@@ -88,7 +110,7 @@ export async function createTank(host: HTMLElement, options: TankOptions): Promi
     for (const layer of layers) layer.resize(world)
   }
   resize()
-  school.setCount(options.fishCount ?? 15)
+  fish.setCount(options.fishCount ?? 15)
   const observer = new ResizeObserver(resize)
   observer.observe(host)
 
@@ -113,11 +135,12 @@ export async function createTank(host: HTMLElement, options: TankOptions): Promi
       width: app.screen.width,
       height: app.screen.height,
       resolution: app.renderer.resolution,
-      fish: school.count(),
+      people: fish.count(),
+      fish: fish.swimming(),
     }),
-    fishCount: () => school.count(),
-    setFishCount: (count) => school.setCount(count),
-    refreshSpecies: (id) => school.refreshSpecies(id),
+    fishCount: () => fish.count(),
+    setFishCount: (count) => fish.setCount(count),
+    refreshSpecies: (id) => fish.refreshSpecies(id),
     destroy() {
       observer.disconnect()
       document.removeEventListener('visibilitychange', onVisibilityChange)

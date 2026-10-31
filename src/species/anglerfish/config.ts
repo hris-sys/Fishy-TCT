@@ -5,7 +5,7 @@ import tail from './tail.svg'
 export const anglerfish: SpeciesConfig = {
   id: 'anglerfish',
   label: 'Anglerfish',
-  scale: 0.8,
+  scale: 0.4,
   body,
   tail: { src: tail, pivot: { x: 46, y: 30 }, attach: { x: -55, y: 8 }, swing: 0.3 },
   // Under the glowing lure.
@@ -17,12 +17,12 @@ export const anglerfish: SpeciesConfig = {
     feather: 0.05,
   },
   swim: {
-    speed: 16,
+    speed: 12,
     turnRate: 0.8,
     depth: { top: 0.88, bottom: 1 },
-    wiggleHz: 1.2,
+    wiggleHz: 1.5,
     wander: 0.4,
-    bob: 1.5,
+    bob: 0.8,
     dart: 0,
     predator: false,
   },

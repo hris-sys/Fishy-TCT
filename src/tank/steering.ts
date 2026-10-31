@@ -17,8 +17,15 @@ const WALL_PUSH = 3
 const SEPARATION_PUSH = 4
 const FLEE_PUSH = 6
 /** A predator is noticed this many times its own size away. */
-const FLEE_RANGE = 2.2
-const HOME_RADIUS = 80
+const FLEE_RANGE = 3
+const HOME_RADIUS = 60
+/** Schools: how strongly members match the school's average velocity, per second. */
+const SCHOOL_ALIGN = 1.6
+/** Schools: pull back toward the group once a member strays further than this many of its own sizes. */
+const SCHOOL_SPREAD = 2.2
+const SCHOOL_COHESION = 1.4
+/** School members swim closer together than strangers do. */
+const SCHOOLMATE_SPACE = 0.6
 
 /** The vertical range a fish's center may use: below the surface and above the sand. */
 export function waterColumn(fish: Fish, world: TankWorld) {
@@ -34,11 +41,11 @@ export function depthBand(fish: Fish, world: TankWorld) {
 }
 
 /**
- * Moves one fish for one frame. Forces add up to an acceleration: wander (meander along the
+ * Moves one fish for one step. Forces add up to an acceleration: wander (meander along the
  * current heading), stay in the depth band, keep off the walls, keep a little space from
- * neighbours, flee predators, and for some species head home.
+ * neighbours, flee predators, stick with the school, and for some species head home.
  */
-export function steer(fish: Fish, school: readonly Fish[], world: TankWorld, dt: number) {
+export function steer(fish: Fish, everyone: readonly Fish[], world: TankWorld, dt: number) {
   const { swim } = fish.config
   const s = world.scale
 
@@ -52,7 +59,7 @@ export function steer(fish: Fish, school: readonly Fish[], world: TankWorld, dt:
   }
   fish.boost *= Math.exp(-dt * 2.5)
 
-  const cruise = swim.speed * s * (1 + fish.boost)
+  const cruise = swim.speed * s * fish.pace * (1 + fish.boost)
   let ax = 0
   let ay = 0
 
@@ -89,14 +96,15 @@ export function steer(fish: Fish, school: readonly Fish[], world: TankWorld, dt:
 
   // Neighbours: a light push apart, and a hard swerve away from nearby predators.
   const radius = fish.radius(s)
-  for (const other of school) {
+  for (const other of everyone) {
     if (other === fish) continue
     const dx = fish.x - other.x
     const dy = fish.y - other.y
     const distance = Math.hypot(dx, dy) || 0.001
     const otherRadius = other.radius(s)
 
-    const personalSpace = radius + otherRadius
+    const sameSchool = fish.schoolmates !== null && other.schoolmates === fish.schoolmates
+    const personalSpace = (radius + otherRadius) * (sameSchool ? SCHOOLMATE_SPACE : 1)
     if (distance < personalSpace) {
       const strength = (1 - distance / personalSpace) * cruise * SEPARATION_PUSH
       ax += (dx / distance) * strength
@@ -110,6 +118,36 @@ export function steer(fish: Fish, school: readonly Fish[], world: TankWorld, dt:
         ax += (dx / distance) * fear * cruise * FLEE_PUSH
         ay += (dy / distance) * fear * cruise * FLEE_PUSH
         fish.boost = Math.max(fish.boost, fear * 1.2)
+      }
+    }
+  }
+
+  // School: match the group's velocity, and drift back toward its middle when straying.
+  if (fish.schoolmates) {
+    let centerX = 0
+    let centerY = 0
+    let avgVx = 0
+    let avgVy = 0
+    let n = 0
+    for (const mate of fish.schoolmates) {
+      if (mate === fish) continue
+      centerX += mate.x
+      centerY += mate.y
+      avgVx += mate.vx
+      avgVy += mate.vy
+      n++
+    }
+    if (n > 0) {
+      ax += (avgVx / n - fish.vx) * SCHOOL_ALIGN
+      ay += (avgVy / n - fish.vy) * SCHOOL_ALIGN
+      const dx = centerX / n - fish.x
+      const dy = centerY / n - fish.y
+      const distance = Math.hypot(dx, dy) || 0.001
+      const spread = radius * SCHOOL_SPREAD
+      if (distance > spread) {
+        const pull = Math.min((distance - spread) / spread, 2) * cruise * swim.turnRate * SCHOOL_COHESION
+        ax += (dx / distance) * pull
+        ay += (dy / distance) * pull
       }
     }
   }

@@ -3,43 +3,66 @@ import type { SceneLayer } from './layer'
 import { makeCanvas, randomBetween, seededRandom } from './util'
 
 const SEGMENTS = 14
-const TINTS = ['#ffffff', '#d6efc4', '#b3e0bd', '#e6f3a6']
-/** Plant clumps along the sand, as fractions of the width. The gap at 0.72 is the anemone's. */
-const CLUMPS = [0.06, 0.2, 0.44, 0.9]
+
+interface Clump {
+  /** Position along the sand, as a fraction of the width. */
+  x: number
+  blades: number
+  /** Blade length range, in art units. */
+  length: [number, number]
+}
+
+/** Behind the fish: seagrass and kelp among the rocks. */
+const BACK: Clump[] = [
+  { x: 0.03, blades: 6, length: [90, 190] },
+  { x: 0.27, blades: 5, length: [70, 150] },
+  { x: 0.6, blades: 7, length: [120, 240] },
+  { x: 0.79, blades: 4, length: [60, 120] },
+]
+
+/** In front of the fish: a few short tufts at the edges, for depth. They stay low so faces stay visible. */
+const FRONT: Clump[] = [
+  { x: 0.01, blades: 5, length: [35, 70] },
+  { x: 0.985, blades: 5, length: [35, 75] },
+]
+
+const BACK_TINTS = ['#ffffff', '#dfeec0', '#c4e0b0', '#eae6a8', '#b9d4b4']
+const FRONT_TINTS = ['#7d9a76', '#6e8c6c', '#8aa07a']
 
 interface Blade {
-  rope: MeshRope
   points: Point[]
-  xFraction: number
-  /** Length in art units. */
+  rope: MeshRope
+  x: number
   length: number
+  lean: number
   phase: number
   speed: number
   sway: number
 }
 
-/** Seaweed: tapered ribbons rooted in the sand that sway in a slow current. */
-export function createPlants(): SceneLayer {
+/** Seagrass: thin tapered blades rooted in the sand, swaying in a slow current. */
+export function createPlants(layer: 'back' | 'front'): SceneLayer {
   const view = new Container()
   const texture = Texture.from(drawBladeTexture())
-  const rand = seededRandom(5)
+  const rand = seededRandom(layer === 'back' ? 5 : 6)
+  const tints = layer === 'back' ? BACK_TINTS : FRONT_TINTS
   const blades: Blade[] = []
 
-  for (const clump of CLUMPS) {
-    const count = 2 + Math.floor(rand() * 3)
-    for (let i = 0; i < count; i++) {
+  for (const clump of layer === 'back' ? BACK : FRONT) {
+    for (let i = 0; i < clump.blades; i++) {
       const points = Array.from({ length: SEGMENTS }, () => new Point())
       const rope = new MeshRope({ texture, points })
-      rope.tint = TINTS[Math.floor(rand() * TINTS.length)]
+      rope.tint = tints[Math.floor(rand() * tints.length)]
       view.addChild(rope)
       blades.push({
-        rope,
         points,
-        xFraction: clump + randomBetween(-0.035, 0.035, rand),
-        length: randomBetween(110, 230, rand),
+        rope,
+        x: clump.x + randomBetween(-0.03, 0.03, rand),
+        length: randomBetween(clump.length[0], clump.length[1], rand),
+        lean: randomBetween(-12, 12, rand),
         phase: rand() * Math.PI * 2,
-        speed: randomBetween(0.7, 1.1, rand),
-        sway: randomBetween(14, 26, rand),
+        speed: randomBetween(0.6, 1, rand),
+        sway: randomBetween(10, 22, rand),
       })
     }
   }
@@ -48,7 +71,7 @@ export function createPlants(): SceneLayer {
     view,
     resize(world) {
       for (const blade of blades) {
-        blade.rope.position.set(blade.xFraction * world.width, world.sandY + 8 * world.scale)
+        blade.rope.position.set(blade.x * world.width, world.sandY + 10 * world.scale)
         blade.rope.scale.set(world.scale)
       }
     },
@@ -57,29 +80,40 @@ export function createPlants(): SceneLayer {
         for (let i = 0; i < SEGMENTS; i++) {
           const t = i / (SEGMENTS - 1)
           // The base stays put; the bend grows toward the tip and lags behind, like a wave.
-          blade.points[i].set(
-            Math.sin(time * blade.speed + blade.phase - t * 1.8) * blade.sway * t ** 1.4,
-            -blade.length * t,
-          )
+          const bend = Math.sin(time * blade.speed + blade.phase - t * 1.8) * blade.sway + blade.lean
+          blade.points[i].set(bend * t ** 1.5, -blade.length * t)
         }
       }
     },
   }
 }
 
-/** A leaf shape lying along the x axis: wide at the root (left), tapering to a tip (right). */
+/** A grass blade lying along the x axis: root on the left, tip on the right, with a pale midrib. */
 function drawBladeTexture() {
-  const { canvas, ctx } = makeCanvas(256, 32)
-  const gradient = ctx.createLinearGradient(0, 0, 0, 32)
-  gradient.addColorStop(0, '#2f7a3a')
-  gradient.addColorStop(0.5, '#7fd27a')
-  gradient.addColorStop(1, '#2f7a3a')
-  ctx.fillStyle = gradient
+  const { canvas, ctx } = makeCanvas(256, 20)
+  const across = ctx.createLinearGradient(0, 0, 0, 20)
+  across.addColorStop(0, '#2d6630')
+  across.addColorStop(0.5, '#79b866')
+  across.addColorStop(1, '#2a5e2e')
+  ctx.fillStyle = across
   ctx.beginPath()
-  ctx.moveTo(0, 5)
-  ctx.quadraticCurveTo(150, -2, 256, 16)
-  ctx.quadraticCurveTo(150, 34, 0, 27)
+  ctx.moveTo(0, 4)
+  ctx.quadraticCurveTo(170, 1, 256, 10)
+  ctx.quadraticCurveTo(170, 19, 0, 16)
   ctx.closePath()
   ctx.fill()
+  ctx.strokeStyle = 'rgba(210, 240, 170, 0.35)'
+  ctx.lineWidth = 1
+  ctx.beginPath()
+  ctx.moveTo(0, 10)
+  ctx.lineTo(240, 10)
+  ctx.stroke()
+  // Lighter toward the tip, where the sun reaches.
+  const along = ctx.createLinearGradient(0, 0, 256, 0)
+  along.addColorStop(0, 'rgba(0, 0, 0, 0.25)')
+  along.addColorStop(1, 'rgba(255, 255, 200, 0.15)')
+  ctx.globalCompositeOperation = 'source-atop'
+  ctx.fillStyle = along
+  ctx.fillRect(0, 0, 256, 20)
   return canvas
 }

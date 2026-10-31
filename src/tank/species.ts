@@ -32,6 +32,8 @@ export interface SwimConfig {
   predator: boolean
   /** Keeps returning to this spot. */
   home?: 'anemone'
+  /** When set, one person's fish is a school of this many, all wearing their face. */
+  school?: number
 }
 
 /** One species, as data. Art faces right; all positions are in the body art's units, relative to its center. */

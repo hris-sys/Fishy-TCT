@@ -1,17 +1,22 @@
 import { Container, Sprite, type Texture } from 'pixi.js'
-import { FACE_SIZE, bakeMaskedFace } from './face'
+import { FACE_SIZE } from './face'
+import type { TankWorld } from './layer'
 import type { LoadedSpecies, SpeciesConfig } from './species'
-import { canvasTexture, clamp } from './util'
+import { clamp, lerp, randomBetween } from './util'
 
 /** Seconds for a full left-to-right turn. */
 const TURN_SECONDS = 0.45
 /** Steepest nose-up or nose-down tilt, in radians. */
 const MAX_PITCH = 0.4
 const BOB_HZ = 0.3
+/** Water absorbs red light: fish near the sand are tinted toward this colour (bodies only, never faces). */
+const DEEP_TINT = [150, 182, 210]
+const DEEP_TINT_STRENGTH = 0.55
 
 /**
  * One fish: a body and tail that flip when it turns, plus a face that follows the head but is
  * never mirrored. Position and velocity are driven by the steering code; this class only draws.
+ * The face texture belongs to the owner and may be shared by a whole school.
  */
 export class Fish {
   readonly view = new Container()
@@ -27,12 +32,15 @@ export class Fish {
   boost = 0
   /** Seconds until the next dart. */
   dartTimer = Math.random() * 3
+  /** Every member of this fish's school, itself included; null for a fish that swims alone. */
+  schoolmates: Fish[] | null = null
+  /** Small per-fish speed difference, so a school doesn't move in lockstep. */
+  readonly pace = randomBetween(0.9, 1.1)
 
   private readonly flip = new Container()
   private readonly tail: Sprite
   private readonly body: Sprite
   private readonly face: Sprite
-  private readonly faceSource: HTMLCanvasElement
 
   /** 0 when facing right, π when facing left; scale.x is its cosine, so a turn squashes through 0. */
   private turn = 0
@@ -42,13 +50,12 @@ export class Fish {
   private tailPhase = Math.random() * Math.PI * 2
   private bobPhase = Math.random() * Math.PI * 2
 
-  constructor(species: LoadedSpecies, faceSource: HTMLCanvasElement) {
+  constructor(species: LoadedSpecies, face: Texture) {
     this.species = species
-    this.faceSource = faceSource
     this.tail = new Sprite(species.tail)
     this.body = new Sprite(species.body)
     this.body.anchor.set(0.5)
-    this.face = new Sprite(this.bakeFace())
+    this.face = new Sprite(face)
     this.face.anchor.set(0.5)
     this.flip.addChild(this.tail, this.body)
     this.view.addChild(this.flip, this.face)
@@ -56,6 +63,10 @@ export class Fish {
 
   get config(): SpeciesConfig {
     return this.species.config
+  }
+
+  setFace(texture: Texture) {
+    this.face.texture = texture
   }
 
   /** Art units from the center to the nose, and to the tail tip. */
@@ -69,6 +80,15 @@ export class Fish {
   halfWidth(worldScale: number) {
     const { front, back } = this.reach()
     return ((front + back) / 2) * this.config.scale * worldScale
+  }
+
+  halfHeight(worldScale: number) {
+    return this.body.texture.height * 0.5 * this.config.scale * worldScale
+  }
+
+  /** Rough size for keeping fish apart, in px. */
+  radius(worldScale: number) {
+    return (this.halfWidth(worldScale) + this.halfHeight(worldScale)) * 0.5
   }
 
   /**
@@ -93,26 +113,10 @@ export class Fish {
     return this.facing === 1 ? { left: back * s, right: front * s } : { left: front * s, right: back * s }
   }
 
-  halfHeight(worldScale: number) {
-    return this.body.texture.height * 0.5 * this.config.scale * worldScale
-  }
-
-  /** Rough size for keeping fish apart, in px. */
-  radius(worldScale: number) {
-    return (this.halfWidth(worldScale) + this.halfHeight(worldScale)) * 0.5
-  }
-
   setFacing(direction: 1 | -1) {
     this.facing = direction
     this.turn = direction === 1 ? 0 : Math.PI
     this.flipX = direction
-  }
-
-  /** Re-cuts the face after the species' mask changed. */
-  refreshFace() {
-    const old = this.face.texture
-    this.face.texture = this.bakeFace()
-    old.destroy(true)
   }
 
   /** Turns toward the swim direction. Runs every simulation step, before steering. */
@@ -126,9 +130,9 @@ export class Fish {
   }
 
   /** Updates the sprites from the simulated state. Runs once per frame. */
-  animate(dt: number, worldScale: number) {
+  animate(dt: number, world: TankWorld) {
     const { tail, faceSlot, swim } = this.config
-    const cruise = swim.speed * worldScale
+    const cruise = swim.speed * world.scale
     const speed = Math.hypot(this.vx, this.vy)
     const flipX = this.flipX
     const side = flipX >= 0 ? 1 : -1
@@ -150,18 +154,23 @@ export class Fish {
     this.face.scale.set(Math.abs(flipX) * faceScale, faceScale)
     this.face.rotation = faceSlot.rotation * side
 
+    // Deeper water looks bluer.
+    const depth = clamp(this.y / world.sandY, 0, 1) * DEEP_TINT_STRENGTH
+    const tint =
+      (Math.round(lerp(255, DEEP_TINT[0], depth)) << 16) |
+      (Math.round(lerp(255, DEEP_TINT[1], depth)) << 8) |
+      Math.round(lerp(255, DEEP_TINT[2], depth))
+    this.body.tint = tint
+    this.tail.tint = tint
+
     this.bobPhase += dt * Math.PI * 2 * BOB_HZ
-    this.view.scale.set(this.config.scale * worldScale)
+    this.view.scale.set(this.config.scale * world.scale)
     this.view.rotation = this.pitch
-    this.view.position.set(this.x, this.y + Math.sin(this.bobPhase) * swim.bob * worldScale)
+    this.view.position.set(this.x, this.y + Math.sin(this.bobPhase) * swim.bob * world.scale)
   }
 
+  /** Removes the sprites. The face texture is left alone; its owner destroys it. */
   destroy() {
-    this.face.texture.destroy(true)
     this.view.destroy({ children: true })
-  }
-
-  private bakeFace(): Texture {
-    return canvasTexture(bakeMaskedFace(this.faceSource, this.config.mask))
   }
 }

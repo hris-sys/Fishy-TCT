@@ -3,10 +3,10 @@ import type { SceneLayer, TankWorld } from './layer'
 import { clamp, makeCanvas, randomBetween } from './util'
 
 const TEXTURE_SIZE = 64
-const MIN_RADIUS = 3
-const MAX_RADIUS = 10
+const MIN_RADIUS = 2
+const MAX_RADIUS = 7
 /** Screen area (CSS px²) per bubble, so small phones and big TVs look equally busy. */
-const AREA_PER_BUBBLE = 26_000
+const AREA_PER_BUBBLE = 30_000
 const MIN_BUBBLES = 10
 const MAX_BUBBLES = 40
 

@@ -9,12 +9,12 @@ import type { SpeciesConfig, Tank } from '../tank'
 export function showDebugPanel(tank: Tank, species: SpeciesConfig[]) {
   const pane = new Pane({ title: 'Tune', expanded: false })
 
-  const tankParams = { fish: tank.fishCount() }
-  pane.addBinding(tankParams, 'fish', { min: 0, max: 40, step: 1 }).on('change', (e) => tank.setFishCount(e.value))
+  const tankParams = { people: tank.fishCount() }
+  pane.addBinding(tankParams, 'people', { min: 0, max: 40, step: 1 }).on('change', (e) => tank.setFishCount(e.value))
 
   for (const config of species) {
     const folder = pane.addFolder({ title: config.label, expanded: false })
-    folder.addBinding(config, 'scale', { min: 0.3, max: 2, step: 0.05 })
+    folder.addBinding(config, 'scale', { min: 0.1, max: 1.5, step: 0.02 })
 
     const swim = folder.addFolder({ title: 'Swim' })
     swim.addBinding(config.swim, 'speed', { min: 5, max: 200, step: 1 })

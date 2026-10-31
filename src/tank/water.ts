@@ -3,9 +3,10 @@ import type { SceneLayer } from './layer'
 import { makeCanvas } from './util'
 
 const GRADIENT: [offset: number, color: string][] = [
-  [0, '#5cc3e0'],
-  [0.45, '#1f7fae'],
-  [1, '#0a2b4d'],
+  [0, '#5ab9d6'],
+  [0.25, '#2e93bf'],
+  [0.6, '#16679a'],
+  [1, '#0a2c4f'],
 ]
 
 /** Vertical water gradient, drawn once into a 1 px wide texture and stretched to fill the screen. */

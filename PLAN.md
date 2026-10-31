@@ -4,7 +4,7 @@ Oct 31, 2026 · @Hristiyan
 
 ## Concept
 
-Tankmates (working name) is a private, always-on aquarium for one friend group, where each friend is exactly one fish wearing their own face.
+Tankmates (working name) is a private, always-on aquarium for one friend group, where each friend is exactly one fish (or one school of fish) wearing their own face.
 
 Open the invite link, line your face up in an oval, and pick one of five species. Name it, and it drops into the tank with a splash.
 
@@ -23,7 +23,7 @@ Every choice favors a working MVP in about two weeks of evenings; flexibility yo
 | Face shape | Store the crop unmasked; each species masks it when drawing | Retune masks or switch species without reprocessing photos; no transparency, so JPEG works |
 | Species | Data, not code: one config entry per species | A sixth fish is new art plus one config object |
 | Multiplayer | Each client simulates its own tank; only fish data and events are shared | Syncing positions is the expensive part of multiplayer and adds nothing here |
-| Ownership | One fish per person per tank; `tank_id` in the schema from day one | "You are your fish" is the core identity; multi-tank costs one column now instead of a migration later |
+| Ownership | One fish per person per tank; `tank_id` in the schema from day one. A schooling species draws several fish from that one row | "You are your fish" is the core identity; multi-tank costs one column now instead of a migration later |
 | Access | Invite code → anonymous auth → Row Level Security; private storage bucket | Faces are personal data: no signup friction, and nobody without the code sees anything |
 | Stack | Vite + TypeScript + PixiJS; tank engine as a framework-free module | WebGL masks, tint and filters at 60 fps on phones; build the UI screens in whatever you're fastest in, Angular included |
 | Hosting | Vercel (frontend) + Supabase (Postgres, Storage, Auth, Realtime) | Free tiers cover a friend group, HTTPS is built in, and realtime needs no server of your own |
@@ -34,13 +34,13 @@ Each species gets its own silhouette, depth band and swim style, so the tank use
 
 | Fish | Face placement | Depth band | Swims | Tap reaction |
 | --- | --- | --- | --- | --- |
-| Goldfish | Round face on the head | Middle | Lazy wandering, flowing tail | Blows a big bubble |
+| Blue chromis (school) | Round face on the head; one person is a school of 7, all with their face | Upper to middle | Tight school that turns together; scatters from sharks and regroups | The school scatters and regroups |
 | Clownfish | Head, in front of the first white stripe | Low to middle, near the anemone | Quick darts, keeps returning to its anemone | Ducks into the anemone |
 | Pufferfish | The face is the whole body | Low to middle | Slow bobbing | Puffs to 2× size with spikes |
-| Shark | Front of the head | Whole tank | Fast, long patrols; other fish swerve away | Jaw snap and lunge |
+| Reef shark | Front of the head | Whole tank | Fast, long patrols; other fish swerve away | Jaw snap and lunge |
 | Anglerfish | Under the glowing lure | Bottom | Creeps along the sand | Lure flashes |
 
-Swap any species freely, as long as the silhouettes stay distinct.
+Swap any species freely, as long as the silhouettes stay distinct. (The goldfish was swapped for the chromis school in iteration 1: a school was wanted, and the goldfish was the only freshwater fish in a sea tank.)
 
 ## Architecture
 
@@ -95,7 +95,7 @@ Each species config holds these fields:
 | `body`, `tail` | Sprite paths, plus the tail's pivot point |
 | `faceSlot` | Position, size and rotation of the face relative to the body |
 | `mask` | Shape (circle, oval or custom path) and edge feather |
-| `swim` | Speed, turn rate, depth band, wiggle frequency |
+| `swim` | Speed, turn rate, depth band, wiggle frequency, and an optional school size |
 | `reaction` | Name of the tap animation |
 
 Working rules:
@@ -131,10 +131,11 @@ Goal: a tank that's pleasant to stare at, with placeholder faces.
 - [x] Fish entity with a sine-driven tail wiggle and bob. Turn by tweening `scale.x` through 0; flip the body but never the face, or it jumps on every turn.
 - [x] Movement from steering behaviors (wander, soft wall avoidance, light separation) inside each species' depth band. Other fish flee from nearby sharks.
 - [x] A Tweakpane debug panel to tune species parameters live. _(Open with `?debug`; "Copy config" exports the tuned numbers.)_
+- [x] Added after the first phone test: a schooling species (blue chromis, 7 fish per person, replacing the goldfish), a realism pass on fish and scenery (shaded bodies, depth tint, distant reef, rocks and corals, sand caustics, marine snow, surface shimmer), and all fish at half the size.
 
 **Done when:** 15 placeholder fish swim for 5 minutes without clumping, jittering or escaping, at 60 fps on a mid-range phone.
 
-_Headless soak test (5 simulated minutes, 15 fish): no fish more than 1 px past an edge, fish spaced wider than a random spread, simulation under 0.2 ms per frame. Still to confirm: 60 fps on a real phone._
+_Headless soak test (5 simulated minutes, 15 people = 33 fish with three schools): no fish past an edge, schools stay within ~25 px of their middle, simulation about 0.2 ms per frame. The first version passed on a real phone; the realism pass needs a re-check._
 
 ## Iteration 2 · Make your fish, local only (2–3 evenings)
 

@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="100" height="56" viewBox="0 0 100 56">
+  <defs>
+    <linearGradient id="skin" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#17609a"/>
+      <stop offset="0.4" stop-color="#3aa8d4"/>
+      <stop offset="0.75" stop-color="#9fdfec"/>
+      <stop offset="1" stop-color="#dff5f7"/>
+    </linearGradient>
+    <linearGradient id="fin" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1f78ad" stop-opacity="0.85"/>
+      <stop offset="1" stop-color="#6cc4e0" stop-opacity="0.5"/>
+    </linearGradient>
+    <radialGradient id="shine" cx="0.45" cy="0.3" r="0.55">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.5"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <path d="M20 17 C30 3 60 1 78 12 L68 15 C54 11 36 12 20 19 Z" fill="url(#fin)"/>
+  <path d="M42 44 C50 55 66 55 72 43 Z" fill="url(#fin)"/>
+  <path d="M6 28 C8 16 26 8 50 8 C70 8 88 16 95 27 C88 39 70 48 50 48 C26 48 8 40 6 28 Z" fill="url(#skin)" stroke="#0d4466" stroke-opacity="0.35" stroke-width="1.2"/>
+  <ellipse cx="46" cy="21" rx="32" ry="9" fill="url(#shine)"/>
+  <path d="M10 28 C30 31 60 31 90 27" fill="none" stroke="#ffffff" stroke-opacity="0.18" stroke-width="1.5"/>
+  <path d="M46 30 C38 37 41 43 50 38 Z" fill="#8fd7ea" fill-opacity="0.65"/>
+</svg>

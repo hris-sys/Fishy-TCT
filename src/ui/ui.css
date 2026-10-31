@@ -366,3 +366,105 @@
   border-color: var(--ink);
   box-shadow: 0 0 0 3px var(--accent);
 }
+
+/* Before you're in: a card over the empty tank. No blur here: the tank keeps swimming behind it,
+   and blurring a moving canvas every frame is expensive on phones. */
+.sheet.gate {
+  justify-content: center;
+  align-items: center;
+  padding: 24px;
+  background: rgba(4, 26, 46, 0.4);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.gate-card {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  max-width: 400px;
+  padding: 26px 22px;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: rgba(4, 26, 46, 0.86);
+  text-align: center;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+}
+
+.gate-card h1 {
+  margin: 0;
+  font: 750 26px/1.15 var(--ui-font);
+}
+
+.gate-card p {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 16px;
+  line-height: 1.45;
+}
+
+.gate-card strong {
+  color: var(--ink);
+}
+
+.gate-card .note {
+  font-size: 13px;
+}
+
+.gate-card .loading {
+  padding: 12px 0;
+}
+
+.join-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.form-error {
+  margin: 0;
+  color: #ffc1b3;
+  font-size: 14px;
+  text-align: center;
+}
+
+.button.danger {
+  border-color: rgba(255, 140, 120, 0.4);
+  background: transparent;
+  color: #ffb3a3;
+}
+
+.button.small {
+  min-height: 40px;
+  padding: 0 14px;
+  font-size: 15px;
+}
+
+/* Tank owner: remove a tapped fish. */
+.action-bar {
+  position: fixed;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom) + 84px);
+  transform: translateX(-50%);
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: calc(100vw - 32px);
+  padding: 8px 8px 8px 16px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(4, 26, 46, 0.9);
+  color: var(--ink);
+  font: 600 15px/1.2 var(--ui-font);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+}
+
+.action-label {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}

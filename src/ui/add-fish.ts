@@ -2,34 +2,48 @@ import type { SpeciesConfig } from '../tank'
 import { type Cropper, createCropper } from './cropper'
 import { h, icon } from './dom'
 import { type FacePhoto, exportFace, loadPhoto } from './photo'
-import { createSpeciesPicker } from './species-picker'
+import { type PickerInitial, type PickerValue, createSpeciesPicker } from './species-picker'
 
 export interface NewFish {
   name: string
   species: string
   tint: number | null
-  /** The 256 px face square, as it will be stored. */
-  face: HTMLCanvasElement
-  /** The encoded face file, for uploading (iteration 3). */
-  blob: Blob
+  /** The 256 px face square, exactly as stored. */
+  face: CanvasImageSource
+  /** The newly encoded face file, or null when the face didn't change. */
+  blob: Blob | null
 }
 
-interface AddFishOptions {
+interface FishSheetOptions {
   species: SpeciesConfig[]
-  onDone(fish: NewFish): void
+  /** Editing an existing fish: opens on the species step with its current face. */
+  existing?: { name: string; species: string; tint: number | null; face: CanvasImageSource }
+  /** Name to suggest for a new fish. */
+  suggestedName?: string
+  /** Saves the fish. If it throws, the sheet stays open and shows `describeError`'s message. */
+  onSave(fish: NewFish): Promise<void>
+  /** Offered when editing. */
+  onRemove?(): Promise<void>
   onClose(): void
+  describeError?(error: unknown): string
 }
 
 /**
- * The add-your-fish flow, as a full-screen sheet: pick a photo, line up the face, pick a species,
- * name and colour. Everything happens on the phone; nothing is uploaded yet.
+ * The fish sheet: pick a photo, line up the face, then species, name and colour. When editing,
+ * it opens straight on species/name/colour, with a way to take a new photo or remove the fish.
  */
-export function openAddFish(options: AddFishOptions) {
-  const root = h('div', { class: 'sheet', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Add your fish' })
+export function openFishSheet(options: FishSheetOptions) {
+  const editing = Boolean(options.existing)
+  const describe = options.describeError ?? (() => 'Something went wrong. Please try again.')
+  const root = h('div', { class: 'sheet', role: 'dialog', 'aria-modal': 'true', 'aria-label': editing ? 'Your fish' : 'Add your fish' })
   document.body.append(root)
 
   let leaveStep: (() => void) | null = null
   let cropper: { photo: HTMLCanvasElement; cropper: Cropper } | null = null
+  // Choices survive going back to change the photo.
+  let choices: PickerInitial = options.existing
+    ? { name: options.existing.name, species: options.existing.species, tint: options.existing.tint }
+    : { name: options.suggestedName ?? '' }
 
   function show(content: HTMLElement, onLeave?: () => void) {
     leaveStep?.()
@@ -60,8 +74,7 @@ export function openAddFish(options: AddFishOptions) {
       h('button', { type: 'button', class: 'icon-button', 'aria-label': 'Close', onclick: close }, icon('close')),
     )
 
-  // Step 1: a selfie or a photo from the library. No camera code yet: the file input opens the
-  // front camera on phones when it has capture="user".
+  // Step 1: a selfie or a photo from the library. On phones, capture="user" opens the front camera.
   function photoStep(error?: string) {
     const pick = (label: string, iconName: 'camera' | 'image', selfie: boolean) => {
       const input = h('input', {
@@ -77,15 +90,16 @@ export function openAddFish(options: AddFishOptions) {
       })
       return h('label', { class: selfie ? 'button primary big' : 'button big' }, input, icon(iconName), label)
     }
+    const back = editing && options.existing ? () => speciesStep({ canvas: options.existing!.face, blob: null }) : undefined
     show(
       h(
         'div',
         { class: 'step' },
-        header(''),
+        header('', back),
         h(
           'div',
           { class: 'intro' },
-          h('h1', {}, 'Add your fish'),
+          h('h1', {}, editing ? 'New photo' : 'Add your fish'),
           h('p', {}, 'Your face goes on a fish. Use a clear photo, looking straight at the camera.'),
           error ? h('p', { class: 'error', role: 'alert' }, error) : null,
           h('div', { class: 'stack' }, pick('Take a selfie', 'camera', true), pick('Choose a photo', 'image', false)),
@@ -119,7 +133,8 @@ export function openAddFish(options: AddFishOptions) {
         onclick: async () => {
           use.disabled = true
           try {
-            speciesStep(await exportFace(photo, crop.crop()))
+            const face = await exportFace(photo, crop.crop())
+            speciesStep({ canvas: face.canvas, blob: face.blob })
           } catch {
             use.disabled = false
             photoStep('Something went wrong saving that photo. Please try again.')
@@ -139,32 +154,89 @@ export function openAddFish(options: AddFishOptions) {
     )
   }
 
-  // Step 3: species, name and colour, with a live preview of the face on every fish.
-  function speciesStep(face: FacePhoto) {
-    const drop = h(
-      'button',
-      {
-        type: 'button',
-        class: 'button primary',
-        disabled: true,
-        onclick: () => {
-          const chosen = picker.value()
-          if (!chosen.name) return
-          close()
-          options.onDone({ ...chosen, face: face.canvas, blob: face.blob })
-        },
+  // Step 3: species, name and colour, with the face on every fish in a mini tank.
+  function speciesStep(face: { canvas: CanvasImageSource; blob: FacePhoto['blob'] | null }) {
+    const message = h('p', { class: 'form-error', role: 'alert', hidden: true })
+    const saveLabel = editing ? 'Save changes' : 'Drop it in'
+    const save = h('button', { type: 'button', class: 'button primary', disabled: !choices.name, onclick: () => void submit() }, saveLabel)
+
+    const fail = (error: unknown) => {
+      message.textContent = describe(error)
+      message.hidden = false
+    }
+
+    async function submit() {
+      const chosen: PickerValue = picker.value()
+      if (!chosen.name) return
+      save.disabled = true
+      save.textContent = 'Saving…'
+      message.hidden = true
+      try {
+        await options.onSave({ ...chosen, face: face.canvas, blob: face.blob })
+        close()
+      } catch (error) {
+        fail(error)
+        save.disabled = false
+        save.textContent = saveLabel
+      }
+    }
+
+    const picker = createSpeciesPicker(
+      face.canvas,
+      options.species,
+      (value) => {
+        choices = value
+        save.disabled = value.name.length === 0
       },
-      'Drop it in',
+      choices,
     )
-    const picker = createSpeciesPicker(face.canvas, options.species, (value) => {
-      drop.disabled = value.name.length === 0
-    })
+
+    // Removing takes two taps, so it can't happen by accident.
+    let armed = false
+    const remove = options.onRemove
+      ? h(
+          'button',
+          {
+            type: 'button',
+            class: 'button danger',
+            onclick: async () => {
+              if (!armed) {
+                armed = true
+                remove!.textContent = 'Tap again to remove your fish'
+                return
+              }
+              remove!.disabled = true
+              remove!.textContent = 'Removing…'
+              try {
+                await options.onRemove!()
+                close()
+              } catch (error) {
+                fail(error)
+                armed = false
+                remove!.disabled = false
+                remove!.textContent = 'Remove my fish'
+              }
+            },
+          },
+          'Remove my fish',
+        )
+      : null
+
+    const newPhoto = editing ? h('button', { type: 'button', class: 'button', onclick: () => photoStep() }, icon('camera'), 'New photo') : null
+    const back = editing ? undefined : () => cropStep()
     show(
-      h('div', { class: 'step' }, header('Pick your fish', () => cropStep()), picker.element, h('div', { class: 'step-footer' }, drop)),
+      h(
+        'div',
+        { class: 'step' },
+        header(editing ? 'Your fish' : 'Pick your fish', back),
+        picker.element,
+        h('div', { class: 'step-footer' }, message, newPhoto, save, remove),
+      ),
       () => picker.destroy(),
     )
     void picker.start()
   }
 
-  photoStep()
+  if (options.existing) speciesStep({ canvas: options.existing.face, blob: null })
+  else photoStep()
 }

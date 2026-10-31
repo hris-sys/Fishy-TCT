@@ -27,6 +27,7 @@ const ICONS = {
   close: '<path d="m6 6 12 12M18 6 6 18"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
   minus: '<path d="M5 12h14"/>',
+  fish: '<path d="M3 12c3-4.5 7.5-6 11-4.5 2 .9 3.5 2.6 4.5 4.5-1 1.9-2.5 3.6-4.5 4.5C10.5 18 6 16.5 3 12Z"/><path d="m18.5 12 2.5-3v6Z"/><circle cx="14" cy="11" r="1" fill="currentColor"/>',
 } as const
 
 export function icon(name: keyof typeof ICONS) {

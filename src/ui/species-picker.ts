@@ -20,6 +20,12 @@ export interface PickerValue {
   tint: number | null
 }
 
+export interface PickerInitial {
+  species?: string
+  name?: string
+  tint?: number | null
+}
+
 export interface SpeciesPicker {
   element: HTMLElement
   /** Starts the mini tank; call once the element is in the page. */
@@ -34,9 +40,14 @@ const previewId = (speciesId: string) => `preview-${speciesId}`
  * Your face on every species, swimming in a small tank, plus the species, name and colour choices.
  * Tapping a fish in the mini tank picks its species too.
  */
-export function createSpeciesPicker(face: HTMLCanvasElement, species: SpeciesConfig[], onChange: (value: PickerValue) => void): SpeciesPicker {
-  let selected = species[0].id
-  let tint: number | null = null
+export function createSpeciesPicker(
+  face: CanvasImageSource,
+  species: SpeciesConfig[],
+  onChange: (value: PickerValue) => void,
+  initial: PickerInitial = {},
+): SpeciesPicker {
+  let selected = species.some((config) => config.id === initial.species) ? initial.species! : species[0].id
+  let tint: number | null = initial.tint ?? null
   let tank: Tank | null = null
   let destroyed = false
 
@@ -52,6 +63,7 @@ export function createSpeciesPicker(face: HTMLCanvasElement, species: SpeciesCon
     autocomplete: 'off',
     enterKeyHint: 'done',
     'aria-label': 'Fish name',
+    value: initial.name ?? '',
     oninput: () => onChange(value()),
   })
   const swatches = TINTS.map((option) =>
@@ -74,6 +86,8 @@ export function createSpeciesPicker(face: HTMLCanvasElement, species: SpeciesCon
     h('label', { class: 'field' }, 'Name', nameInput),
     h('div', { class: 'field' }, 'Body colour', h('div', { class: 'swatches' }, ...swatches)),
   )
+
+  species.forEach((config, i) => chips[i].setAttribute('aria-pressed', String(config.id === selected)))
 
   function value(): PickerValue {
     return { species: selected, name: nameInput.value.trim().slice(0, NAME_MAX), tint }

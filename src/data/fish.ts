@@ -134,7 +134,14 @@ export async function removeFish(fish: FishRecord): Promise<void> {
 export function errorDetail(error: unknown): string {
   const e = error as { code?: string; message?: string; status?: number } | null
   const parts = [e?.code, e?.status, e?.message].filter((part) => part !== undefined && part !== '')
-  return parts.length ? parts.join(' · ') : String(error)
+  return `${parts.length ? parts.join(' · ') : String(error)} (${buildStamp()})`
+}
+
+/** Which build this is: where it was built, from which commit, and when. */
+export function buildStamp(): string {
+  const env = import.meta.env.VITE_VERCEL_ENV ?? 'local'
+  const commit = import.meta.env.VITE_VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? 'no commit'
+  return `${env} build ${commit}, ${__BUILD_TIME__.slice(0, 16).replace('T', ' ')} UTC`
 }
 
 /** A short, human message for errors from Supabase or the network. */

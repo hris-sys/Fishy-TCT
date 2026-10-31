@@ -4,6 +4,8 @@ A private, always-on aquarium for one friend group: each friend is one fish wear
 
 Stack: Vite + TypeScript + PixiJS, hosted on Vercel, with Supabase for Postgres, Storage, Auth and Realtime.
 
+Live: https://fishy-tct-wup5.vercel.app (add `?debug` for an FPS readout)
+
 ## Run it locally
 
 ```sh

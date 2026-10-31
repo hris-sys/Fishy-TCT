@@ -116,8 +116,8 @@ Each iteration below has its own checklist and a "Done when" test. Don't start t
 
 Goal: a real URL on your phone from day one.
 
-- [ ] Create the Vite + TypeScript + PixiJS repo and connect GitHub to Vercel, with a preview deploy per branch. _(Repo scaffolded locally; GitHub + Vercel still to do.)_
-- [ ] Create the Supabase project and link it with the Supabase CLI; only the anon key reaches the client. _(`supabase/` initialised and client stub in `src/data/`; project creation + `supabase link` still to do.)_
+- [x] Create the Vite + TypeScript + PixiJS repo and connect GitHub to Vercel, with a preview deploy per branch. _(Live at https://fishy-tct-wup5.vercel.app)_
+- [x] Create the Supabase project and link it with the Supabase CLI; only the anon key reaches the client. _(Project ref `jtynlyyetesmggfnbyik`; client in `src/data/supabase.ts`.)_
 - [x] Build a fullscreen canvas that handles resize and rotation, caps devicePixelRatio at 2, and pauses when the tab is hidden.
 
 **Done when:** the URL shows an empty animated tank on iOS Safari and Android Chrome.

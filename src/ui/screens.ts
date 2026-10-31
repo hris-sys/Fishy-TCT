@@ -11,11 +11,12 @@ export function showLoading(text: string) {
   return gate(h('p', { class: 'loading' }, text))
 }
 
-export function showMessage(title: string, body: string, action?: { label: string; run(): void }) {
+export function showMessage(title: string, body: string, action?: { label: string; run(): void }, detail?: string) {
   return gate(
     h('h1', {}, title),
     h('p', {}, body),
     action ? h('button', { type: 'button', class: 'button primary', onclick: action.run }, action.label) : null,
+    detail ? h('p', { class: 'detail' }, detail) : null,
   )
 }
 

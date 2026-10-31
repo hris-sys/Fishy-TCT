@@ -468,3 +468,10 @@
   white-space: nowrap;
   text-overflow: ellipsis;
 }
+
+/* Small print under an error, so a screenshot shows what actually failed. */
+.gate-card .detail {
+  font: 12px/1.4 ui-monospace, Menlo, monospace;
+  color: rgba(242, 250, 254, 0.45);
+  overflow-wrap: anywhere;
+}

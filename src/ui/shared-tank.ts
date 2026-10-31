@@ -1,4 +1,4 @@
-import { type FishRecord, createFish, describeError, listFish, loadFace, removeFish, signFaceUrls, updateFish } from '../data/fish'
+import { type FishRecord, createFish, describeError, errorDetail, listFish, loadFace, removeFish, signFaceUrls, updateFish } from '../data/fish'
 import { currentUserId, ensureSignedIn } from '../data/session'
 import { type MyTank, inviteTankName, joinTank, myTanks } from '../data/tanks'
 import { species } from '../species'
@@ -56,7 +56,7 @@ export async function startShared(tank: Tank, invite: string | null, setTapHandl
   } catch (error) {
     loading.remove()
     console.error(error)
-    showMessage('Couldn’t open the tank', describeError(error), { label: 'Try again', run: () => location.reload() })
+    showMessage('Couldn’t open the tank', describeError(error), { label: 'Try again', run: () => location.reload() }, errorDetail(error))
   }
 }
 

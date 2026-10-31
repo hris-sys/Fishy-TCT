@@ -130,9 +130,18 @@ export async function removeFish(fish: FishRecord): Promise<void> {
   await deleteFaces([fish.facePath, fish.faceBlubPath])
 }
 
+/** The raw error, for the small print under a message, so a screenshot shows what actually failed. */
+export function errorDetail(error: unknown): string {
+  const e = error as { code?: string; message?: string; status?: number } | null
+  const parts = [e?.code, e?.status, e?.message].filter((part) => part !== undefined && part !== '')
+  return parts.length ? parts.join(' · ') : String(error)
+}
+
 /** A short, human message for errors from Supabase or the network. */
 export function describeError(error: unknown): string {
   const e = error as { code?: string; message?: string } | null
+  if (e?.message?.includes('Missing VITE_SUPABASE')) return 'This copy of the app isn’t connected to its database: the Supabase settings are missing from the build.'
+  if (e?.message?.toLowerCase().includes('captcha')) return 'Supabase is asking for a CAPTCHA, which this app doesn’t show. Turn off CAPTCHA protection in Supabase (Authentication → Attack Protection).'
   if (e?.code === '23505') return 'You already have a fish in this tank.'
   if (e?.code === 'P0002') return 'This invite link is not valid.'
   if (e?.code === '42501') return 'You are not allowed to do that.'

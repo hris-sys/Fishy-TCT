@@ -14,10 +14,16 @@ npm run dev            # http://localhost:5173
 npm run dev -- --host  # also reachable from your phone on the same Wi-Fi
 ```
 
+Opening the app:
+
+- `/join/{code}` is an invite link: pick a name, join, add your fish. The first person to open a new tank's link owns it.
+- `/` takes returning visitors straight into their tank; everyone else sees "invite-only".
+
 URL options:
 
 - `?debug` shows an FPS readout and the **Tune** panel for live species tuning. **Copy config** puts the tuned numbers on the clipboard, ready to paste into `src/species/<id>/config.ts`.
-- `?fish=30` sets how many placeholder people swim (default 10). Chromis people are a school of 7 fish each.
+- `?demo` runs the tank on this device only, with stand-in fish and nothing saved.
+- `?fish=30` adds that many placeholder people (default 10 in demo, 0 otherwise). Chromis people are a school of 7 fish each.
 
 `npm run build` typechecks and builds to `dist/`. `npm run typecheck` only typechecks.
 
@@ -42,7 +48,16 @@ URL options:
 
 The service-role / secret key never goes into the frontend, `.env.local` or the repo.
 
-Schema changes go through `supabase/migrations/` (`npx supabase migration new <name>`, then `npx supabase db push`), never by hand in the dashboard.
+5. Turn on **Authentication → Sign In / Providers → Allow anonymous sign-ins**. Joining needs it.
+
+Schema changes go through `supabase/migrations/` (`npx supabase migration new <name>`, then `npm run db:push`), never by hand in the dashboard.
+
+Database scripts (they use your `supabase login`; no keys needed):
+
+- `npm run db:push` applies new migrations to the linked project.
+- `npm run db:check` runs `supabase/tests/access.sql`: an owner, a member, an outsider and a signed-out visitor try everything, inside a transaction that is rolled back.
+- `npm run check:outsider` signs in as a stranger through the public API and confirms they get zero rows and zero face images.
+- `npm run tank:new -- "Tank name"` creates a tank with a random invite code and prints its link. The code is never stored in the repo.
 
 ## Layout
 

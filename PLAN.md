@@ -58,8 +58,10 @@ tank_members  tank_id, user_id, display_name          PK (tank_id, user_id)
 fish          id, tank_id, owner_id, name, species, tint,
               face_path, face_blub_path, deleted_at, updated_at
               UNIQUE (tank_id, owner_id) WHERE deleted_at IS NULL
-storage       private bucket "faces": {tank_id}/{fish_id}.jpg
+storage       private bucket "faces": {tank_id}/{owner_id}/{file}.webp|jpg
 ```
+
+_As built: faces live under `{tank_id}/{owner_id}/` (a fresh file name per upload), so storage rules can check both membership and "your own folder", and a face can be uploaded before its row exists. The tank's owner is whoever joins it first. Policy helper functions live in a `private` schema the API doesn't expose._
 
 Members read their tank's fish and faces, you write only your own fish, and the tank owner can remove any fish. Joining goes through a security-definer RPC that checks the invite code, so clients never read `tanks` directly. Storage policies use the first path segment (the tank id) and check membership.
 
@@ -158,14 +160,16 @@ _Headless check: portrait, landscape and a sideways-stored photo with EXIF orien
 
 Goal: send the link to the group chat. Iterations 0–3 add up to roughly two weeks of evenings.
 
-- [ ] Schema, RLS and storage policies as migrations (see Architecture), with anonymous sign-ins enabled.
-- [ ] Join flow: `/join/{code}` → anonymous sign-in → join RPC → display name → create fish. Returning visitors land straight in the tank.
-- [ ] Upload the face and insert the fish row. On load, fetch the fish and sign all face URLs in one batch with `createSignedUrls`.
-- [ ] Edit your own fish (re-shoot, rename, change species) and delete it; the tank owner can remove anyone's.
-- [ ] Bucket limits: about 200 KB per file, WebP and JPEG only.
-- [ ] Seed your group's tank and keep the invite code out of the repo.
+- [x] Schema, RLS and storage policies as migrations (see Architecture), with anonymous sign-ins enabled.
+- [x] Join flow: `/join/{code}` → anonymous sign-in → join RPC → display name → create fish. Returning visitors land straight in the tank.
+- [x] Upload the face and insert the fish row. On load, fetch the fish and sign all face URLs in one batch with `createSignedUrls`.
+- [x] Edit your own fish (re-shoot, rename, change species) and delete it; the tank owner can remove anyone's.
+- [x] Bucket limits: about 200 KB per file, WebP and JPEG only.
+- [x] Seed your group's tank and keep the invite code out of the repo. _(`npm run tank:new -- "Name"`; the code exists only in the database and the link.)_
 
 **Done when:** three friends on different phones each add a fish via the link and all see each other after a refresh. A non-member session gets zero rows and zero images when you query the API directly.
+
+_Checks: `npm run db:check` plays owner, member, outsider and signed-out visitor in a rolled-back transaction (all pass). A headless end-to-end run with two people (join, add, refresh, owner removes, edit, remove) passed 18/18, and `npm run check:outsider` found no leaks with real faces in the bucket. Still to confirm: three friends on real phones._
 
 ## Iteration 4 · Live tank (1–2 evenings)
 

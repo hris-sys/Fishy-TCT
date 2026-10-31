@@ -13,6 +13,15 @@ const BOB_HZ = 0.3
 const DEEP_TINT = [150, 182, 210]
 const DEEP_TINT_STRENGTH = 0.55
 
+/** A group of fish wearing the same face, steering as one. */
+export interface School {
+  members: Fish[]
+  /** Depth the school is heading for: 0 is the top of its band, 1 the bottom. Changes every few seconds. */
+  depth: number
+  /** Seconds until the school picks a new depth. */
+  depthTimer: number
+}
+
 /**
  * One fish: a body and tail that flip when it turns, plus a face that follows the head but is
  * never mirrored. Position and velocity are driven by the steering code; this class only draws.
@@ -32,8 +41,8 @@ export class Fish {
   boost = 0
   /** Seconds until the next dart. */
   dartTimer = Math.random() * 3
-  /** Every member of this fish's school, itself included; null for a fish that swims alone. */
-  schoolmates: Fish[] | null = null
+  /** The school this fish belongs to; null for a fish that swims alone. */
+  school: School | null = null
   /** Small per-fish speed difference, so a school doesn't move in lockstep. */
   readonly pace = randomBetween(0.9, 1.1)
 

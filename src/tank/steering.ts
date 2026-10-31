@@ -26,6 +26,8 @@ const SCHOOL_SPREAD = 2.2
 const SCHOOL_COHESION = 1.4
 /** School members swim closer together than strangers do. */
 const SCHOOLMATE_SPACE = 0.6
+/** Schools: spring toward the school's current target depth, per second², capped at half the cruise speed. */
+const SCHOOL_DEPTH_PULL = 0.5
 
 /** The vertical range a fish's center may use: below the surface and above the sand. */
 export function waterColumn(fish: Fish, world: TankWorld) {
@@ -70,10 +72,7 @@ export function steer(fish: Fish, everyone: readonly Fish[], world: TankWorld, d
   ax += (Math.cos(heading) * cruise - fish.vx) * swim.turnRate
   ay += (Math.sin(heading) * LEVEL_BIAS * cruise - fish.vy) * swim.turnRate
 
-  // Depth band: a soft spring back toward the preferred depth.
   const band = depthBand(fish, world)
-  if (fish.y < band.top) ay += (band.top - fish.y) * BAND_PULL
-  else if (fish.y > band.bottom) ay -= (fish.y - band.bottom) * BAND_PULL
 
   // Walls: push away from the sides, harder the closer the fish gets. Margins include the tail.
   const reach = fish.targetExtents(s)
@@ -96,6 +95,7 @@ export function steer(fish: Fish, everyone: readonly Fish[], world: TankWorld, d
 
   // Neighbours: a light push apart, and a hard swerve away from nearby predators.
   const radius = fish.radius(s)
+  let fear = 0
   for (const other of everyone) {
     if (other === fish) continue
     const dx = fish.x - other.x
@@ -103,7 +103,7 @@ export function steer(fish: Fish, everyone: readonly Fish[], world: TankWorld, d
     const distance = Math.hypot(dx, dy) || 0.001
     const otherRadius = other.radius(s)
 
-    const sameSchool = fish.schoolmates !== null && other.schoolmates === fish.schoolmates
+    const sameSchool = fish.school !== null && other.school === fish.school
     const personalSpace = (radius + otherRadius) * (sameSchool ? SCHOOLMATE_SPACE : 1)
     if (distance < personalSpace) {
       const strength = (1 - distance / personalSpace) * cruise * SEPARATION_PUSH
@@ -114,22 +114,39 @@ export function steer(fish: Fish, everyone: readonly Fish[], world: TankWorld, d
     if (other.config.swim.predator && !swim.predator) {
       const range = otherRadius * FLEE_RANGE
       if (distance < range) {
-        const fear = 1 - distance / range
-        ax += (dx / distance) * fear * cruise * FLEE_PUSH
-        ay += (dy / distance) * fear * cruise * FLEE_PUSH
-        fish.boost = Math.max(fish.boost, fear * 1.2)
+        const threat = 1 - distance / range
+        fear = Math.max(fear, threat)
+        // Escape away from the predator: fish above it climb, fish below it dive, so a school splits
+        // around it. With no room that way (at the surface or the sand), go the other way instead.
+        let vertical = dy < 0 ? -1 : 1
+        const room = vertical < 0 ? fish.y - band.column.top : band.column.bottom - fish.y
+        if (room < range * 0.5) vertical = -vertical
+        const steepness = Math.max(Math.abs(dy) / distance, 0.5)
+        ax += (dx / distance) * threat * cruise * FLEE_PUSH
+        ay += vertical * steepness * threat * cruise * FLEE_PUSH
+        fish.boost = Math.max(fish.boost, threat * 1.2)
       }
     }
   }
 
-  // School: match the group's velocity, and drift back toward its middle when straying.
-  if (fish.schoolmates) {
+  // Depth band: a soft spring back toward the preferred depth. A scared fish ignores it until the
+  // danger has passed, so it can flee downward as freely as upward.
+  const calm = 1 - Math.min(1, fear * 2)
+  if (fish.y < band.top) ay += (band.top - fish.y) * BAND_PULL * calm
+  else if (fish.y > band.bottom) ay -= (fish.y - band.bottom) * BAND_PULL * calm
+
+  // School: match the group's velocity, drift back toward its middle when straying, and head for
+  // the school's current target depth.
+  if (fish.school) {
+    const targetY = lerp(band.top, band.bottom, fish.school.depth)
+    ay += clamp((targetY - fish.y) * SCHOOL_DEPTH_PULL, -cruise * 0.5, cruise * 0.5) * calm
+
     let centerX = 0
     let centerY = 0
     let avgVx = 0
     let avgVy = 0
     let n = 0
-    for (const mate of fish.schoolmates) {
+    for (const mate of fish.school.members) {
       if (mate === fish) continue
       centerX += mate.x
       centerY += mate.y

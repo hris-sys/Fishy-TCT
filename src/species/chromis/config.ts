@@ -13,7 +13,7 @@ export const chromis: SpeciesConfig = {
   swim: {
     speed: 42,
     turnRate: 1.8,
-    depth: { top: 0.1, bottom: 0.55 },
+    depth: { top: 0.08, bottom: 0.85 },
     wiggleHz: 3.4,
     wander: 0.45,
     bob: 1.2,

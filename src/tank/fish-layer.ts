@@ -1,6 +1,6 @@
 import { Container, type Texture } from 'pixi.js'
 import { bakeMaskedFace, drawPlaceholderFace } from './face'
-import { Fish } from './fish'
+import { Fish, type School } from './fish'
 import type { SceneLayer, TankWorld } from './layer'
 import type { LoadedSpecies } from './species'
 import { depthBand, steer } from './steering'
@@ -37,6 +37,7 @@ export function createFishLayer(species: LoadedSpecies[]): FishLayer {
   view.sortableChildren = true
   const residents: Resident[] = []
   const allFish: Fish[] = []
+  const schools: School[] = []
   let world: TankWorld | null = null
   let spawned = 0
 
@@ -67,8 +68,12 @@ export function createFishLayer(species: LoadedSpecies[]): FishLayer {
     const size = Math.max(1, Math.round(kind.config.swim.school ?? 1))
     const fish = Array.from({ length: size }, () => new Fish(kind, face))
     const resident: Resident = { species: kind, faceSource, face, fish }
+    if (size > 1) {
+      const school: School = { members: fish, depth: Math.random(), depthTimer: randomBetween(6, 14) }
+      schools.push(school)
+      for (const member of fish) member.school = school
+    }
     for (const member of fish) {
-      if (size > 1) member.schoolmates = fish
       // Big fish swim behind small ones.
       member.view.zIndex = -kind.body.width * kind.body.height * kind.config.scale ** 2
       allFish.push(member)
@@ -79,6 +84,8 @@ export function createFishLayer(species: LoadedSpecies[]): FishLayer {
   }
 
   function remove(resident: Resident) {
+    const school = resident.fish[0].school
+    if (school) schools.splice(schools.indexOf(school), 1)
     for (const fish of resident.fish) {
       allFish.splice(allFish.indexOf(fish), 1)
       fish.destroy()
@@ -121,6 +128,14 @@ export function createFishLayer(species: LoadedSpecies[]): FishLayer {
       const steps = Math.ceil(dt / MAX_STEP)
       const step = dt / steps
       for (let i = 0; i < steps; i++) {
+        // Schools rise and fall: every so often each one heads for a new depth in its band.
+        for (const school of schools) {
+          school.depthTimer -= step
+          if (school.depthTimer <= 0) {
+            school.depth = Math.random()
+            school.depthTimer = randomBetween(6, 14)
+          }
+        }
         for (const fish of allFish) {
           fish.updateTurn(step, world.scale)
           steer(fish, allFish, world, step)

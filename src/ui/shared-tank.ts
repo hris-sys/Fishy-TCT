@@ -13,6 +13,18 @@ import { FEED_ZONE, type TankHandlers } from './handlers'
 import { toast } from './toast'
 
 const HINT_KEY = 'tankmates-hint-play'
+const LAST_TANK_KEY = 'tankmates-last-tank'
+
+/** The tank to open for someone in several: the one this device used last, else the newest joined. */
+function pickTank(tanks: MyTank[]) {
+  let last: string | null = null
+  try {
+    last = localStorage.getItem(LAST_TANK_KEY)
+  } catch {
+    // Private browsing: fall back to the newest.
+  }
+  return tanks.find((info) => info.id === last) ?? tanks[tanks.length - 1]
+}
 /** TV mode: seconds between name tags, which take turns so everyone gets introduced. */
 const TV_TAG_SECONDS = 4.5
 
@@ -74,7 +86,7 @@ export async function startShared(tank: Tank, invite: string | null, handlers: T
         location.replace(`/${location.search}`)
       }, describeError)
     }
-    await openTank(tank, tanks[0], userId, handlers, options, false)
+    await openTank(tank, pickTank(tanks), userId, handlers, options, false)
   } catch (error) {
     loading.remove()
     console.error(error)
@@ -87,6 +99,11 @@ export async function startShared(tank: Tank, invite: string | null, handlers: T
  * and wires up adding, editing and removing.
  */
 async function openTank(tank: Tank, info: MyTank, userId: string, handlers: TankHandlers, options: SharedOptions, addRightAway: boolean) {
+  try {
+    localStorage.setItem(LAST_TANK_KEY, info.id)
+  } catch {
+    // Not remembered; the newest tank opens next time.
+  }
   const records = new Map<string, FishRecord>()
   const faces = new Map<string, Faces>()
   /** Who's online, by user id. Null until the first presence update: until then, nobody sleeps. */
